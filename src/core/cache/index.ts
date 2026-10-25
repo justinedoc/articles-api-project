@@ -32,6 +32,7 @@ const NULL_SENTINEL = "__NULL_CACHE_SENTINEL__";
  * only one DB query executes while all others await the same in-flight Promise.
  */
 const inFlightRequests = new Map<string, Promise<unknown>>();
+const keyVersions = new Map<string, number>();
 
 type CacheEntry<T> = {
 	hit: boolean;
@@ -104,6 +105,9 @@ class CacheService {
 	 * Invalidate a specific cache key.
 	 */
 	async del(key: string): Promise<void> {
+		const nextVersion = (keyVersions.get(key) ?? 0) + 1;
+		keyVersions.set(key, nextVersion);
+
 		if (!isRedisAvailable()) return;
 
 		try {
@@ -166,15 +170,18 @@ class CacheService {
 		fetchFn: () => Promise<T | null>,
 		options: CacheOptions = {},
 	): Promise<T | null> {
+		const version = keyVersions.get(key) ?? 0;
+		const versionedKey = `${key}:v${version}`;
+
 		// 1. Try cache
-		const cached = await this.getEntry<T>(key);
+		const cached = await this.getEntry<T>(versionedKey);
 		if (cached.hit) {
 			return cached.value;
 		}
 
 		// 2. Prevent Thundering Herd using in-flight deduplication
-		if (inFlightRequests.has(key)) {
-			return inFlightRequests.get(key) as Promise<T | null>;
+		if (inFlightRequests.has(versionedKey)) {
+			return inFlightRequests.get(versionedKey) as Promise<T | null>;
 		}
 
 		const fetchPromise = (async () => {
@@ -183,18 +190,18 @@ class CacheService {
 
 				// 3. Cache result (or negative cache if null)
 				if (freshData !== null) {
-					await this.set(key, freshData, options);
+					await this.set(versionedKey, freshData, options);
 				} else if (options.cacheNull !== false) {
-					await this.set(key, null, options);
+					await this.set(versionedKey, null, options);
 				}
 
 				return freshData;
 			} finally {
-				inFlightRequests.delete(key);
+				inFlightRequests.delete(versionedKey);
 			}
 		})();
 
-		inFlightRequests.set(key, fetchPromise);
+		inFlightRequests.set(versionedKey, fetchPromise);
 		return fetchPromise;
 	}
 }

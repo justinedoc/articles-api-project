@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import * as httpStatusCodes from "stoker/http-status-codes";
+import { auth } from "@/core/auth";
 import { baseLogger } from "@/core/logger";
 import { isRedisAvailable, redis } from "@/core/redis";
 import type { AppBindings } from "@/core/types";
@@ -68,18 +69,23 @@ export function rateLimiter(
 			return next();
 		}
 
-		const user = c.get("user");
-		const identifier = options.keyGenerator
-			? options.keyGenerator(c)
-			: user?.id
-				? `user:${user.id}`
-				: `ip:${getClientIp(c)}`;
-
-		const redisKey = `${prefix}:${identifier}`;
-		const now = Date.now();
-		const windowStart = now - windowSeconds * 1000;
-
+		let redisKey = "";
 		try {
+			const user =
+				c.get("user") ??
+				(c.req.header("authorization") || c.req.header("cookie")
+					? (await auth.api.getSession({ headers: c.req.raw.headers }))?.user
+					: null);
+			const identifier = options.keyGenerator
+				? options.keyGenerator(c)
+				: user?.id
+					? `user:${user.id}`
+					: `ip:${getClientIp(c)}`;
+
+			redisKey = `${prefix}:${identifier}`;
+			const now = Date.now();
+			const windowStart = now - windowSeconds * 1000;
+
 			// Atomic sliding-window pipeline
 			const multi = redis.multi();
 			multi.zremrangebyscore(redisKey, 0, windowStart);
