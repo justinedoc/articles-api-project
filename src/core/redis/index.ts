@@ -14,7 +14,6 @@ const redisOptions: RedisOptions = {
 	autoResendUnfulfilledCommands: true,
 	retryStrategy(times) {
 		if (env.NODE_ENV === "test") {
-			// In test environment, don't spam retries indefinitely
 			if (times > 2) return null;
 		}
 		const delay = Math.min(times * 100, 3000);

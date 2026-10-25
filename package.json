@@ -19,6 +19,11 @@
 		"db:studio": "drizzle-kit studio",
 		"db:push:test": "dotenv run -f .env.test -- drizzle-kit push",
 		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:unit": "vitest run src/core src/modules/**/users.service.test.ts",
+		"test:integration": "vitest run src/modules",
+		"test:e2e": "vitest run tests/e2e",
+		"test:coverage": "vitest run --coverage",
 		"services:up": "docker compose -f docker-compose.dev.yml up -d",
 		"services:down": "docker compose -f docker-compose.dev.yml down",
 
@@ -46,6 +51,7 @@
 		"@biomejs/biome": "2.6.3",
 		"@types/node": "^26.6.5",
 		"@types/pg": "^8.23.1",
+		"@vitest/coverage-v8": "^5.0.5",
 
 		"dotenv-cli": "^11.0.0",
 		"drizzle-kit": "^1.0.0-rc.5",
