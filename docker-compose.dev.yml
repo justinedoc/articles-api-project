@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: blog-api-dev-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: blog-api
+    volumes:
+      - blog_api_pg_data:/var/lib/postgresql/data
+
+volumes:
+  blog_api_pg_data:

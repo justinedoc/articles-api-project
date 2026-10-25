@@ -1,0 +1,57 @@
+{
+	"name": "blog-api",
+	"type": "module",
+	"version": "1.0.0",
+	"author": {
+		"name": "Justin Ifeanyi Onyiriuka",
+		"email": "justinifeanyi@gmail.com",
+		"url": "https://github.com/justinedoc"
+	},
+	"scripts": {
+		"dev": "tsx watch src/index.ts",
+		"build": "tsc && tsc-alias",
+		"start": "node dist/index.js",
+		"lint": "biome lint --fix",
+		"format": "biome format --fix",
+		"check": "biome check",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:studio": "drizzle-kit studio",
+		"db:push:test": "dotenv run -f .env.test -- drizzle-kit push",
+		"test": "vitest run",
+		"services:up": "docker compose -f docker-compose.dev.yml up -d",
+		"services:down": "docker compose -f docker-compose.dev.yml down",
+
+		"better-auth-gen-schema": "pnpm dlx @better-auth/cli@latest generate -y --config ./src/core/lib/auth.ts --output ./src/core/db/schema/auth.ts"
+	},
+	"dependencies": {
+		"@hono/node-server": "^2.1.5",
+		"@hono/zod-openapi": "^1.6.3",
+
+		"@scalar/hono-api-reference": "^0.12.14",
+		"better-auth": "^1.7.12",
+		"dotenv": "^18.0.9",
+		"drizzle-orm": "1.0.0-rc.5",
+
+		"hono": "^4.13.13",
+		"hono-pino": "^0.10.3",
+		"pg": "^8.23.1",
+		"pino": "^10.4.0",
+		"pino-pretty": "^13.2.0",
+		"stoker": "^2.0.1",
+		"zod": "^4.6.7"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.3",
+		"@types/node": "^26.6.5",
+		"@types/pg": "^8.23.1",
+
+		"dotenv-cli": "^11.0.0",
+		"drizzle-kit": "^1.0.0-rc.5",
+		"tsc-alias": "^1.9.9",
+		"tsx": "^4.23.15",
+		"typescript": "^7.0.2",
+		"vite": "^8.3.5",
+		"vitest": "^5.0.5"
+	}
+}

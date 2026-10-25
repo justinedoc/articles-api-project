@@ -1,0 +1,44 @@
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { openAPI } from "better-auth/plugins";
+import { db } from "@/core/db";
+import * as schema from "@/core/db/schema";
+import { env } from "@/env";
+
+const appOrigin = new URL(env.APP_URL).origin;
+const apiOrigin = new URL(env.SERVER_URL).origin;
+
+export const auth = betterAuth({
+	database: drizzleAdapter(db, {
+		provider: "pg",
+		schema,
+	}),
+
+	emailAndPassword: {
+		enabled: true,
+	},
+
+	secret: env.BETTER_AUTH_SECRET,
+	baseURL: `${env.SERVER_URL}/api/v1/auth`,
+
+	trustedOrigins: [appOrigin, apiOrigin],
+
+	session: {
+		cookieCache: {
+			enabled: true,
+			maxAge: 600, // 10 minutes cache duration
+		},
+	},
+
+	plugins: [
+		openAPI({
+			disableDefaultReference: true,
+		}),
+	],
+
+	appName: "Blog Api",
+});
+
+type AuthType = typeof auth;
+
+export type AuthSession = AuthType["$Infer"]["Session"];
