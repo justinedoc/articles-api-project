@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as redisModule from "@/core/redis";
 import { cache } from "../index";
 
 describe("CacheService Unit Tests", () => {
@@ -43,13 +44,30 @@ describe("CacheService Unit Tests", () => {
 
 	it("should support negative caching to prevent Cache Penetration when record is null", async () => {
 		const nullFetch = vi.fn().mockResolvedValue(null);
+		vi.spyOn(redisModule, "isRedisAvailable").mockReturnValue(true);
+		vi.spyOn(redisModule.redis, "get")
+			.mockResolvedValueOnce(null)
+			.mockResolvedValueOnce("__NULL_CACHE_SENTINEL__");
+		vi.spyOn(redisModule.redis, "set").mockResolvedValue("OK");
 
-		const result = await cache.getOrSet("test:nonexistent:999", nullFetch, {
+		const options = {
 			cacheNull: true,
 			nullTtlSeconds: 10,
-		});
+			jitter: false,
+		};
+		const result = await cache.getOrSet(
+			"test:nonexistent:999",
+			nullFetch,
+			options,
+		);
+		const cachedResult = await cache.getOrSet(
+			"test:nonexistent:999",
+			nullFetch,
+			options,
+		);
 
 		expect(result).toBeNull();
+		expect(cachedResult).toBeNull();
 		expect(nullFetch).toHaveBeenCalledTimes(1);
 	});
 

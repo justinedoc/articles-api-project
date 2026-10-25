@@ -33,6 +33,11 @@ const NULL_SENTINEL = "__NULL_CACHE_SENTINEL__";
  */
 const inFlightRequests = new Map<string, Promise<unknown>>();
 
+type CacheEntry<T> = {
+	hit: boolean;
+	value: T | null;
+};
+
 /**
  * Add random jitter (±10%) to a TTL to avoid Cache Avalanche.
  */
@@ -42,24 +47,29 @@ function applyJitter(ttl: number): number {
 }
 
 class CacheService {
-	/**
-	 * Retrieve a deserialized value from cache.
-	 */
-	async get<T>(key: string): Promise<T | null> {
-		if (!isRedisAvailable()) return null;
+	private async getEntry<T>(key: string): Promise<CacheEntry<T>> {
+		if (!isRedisAvailable()) return { hit: false, value: null };
 
 		try {
 			const data = await redis.get(key);
-			if (!data) return null;
-			if (data === NULL_SENTINEL) return null;
-			return JSON.parse(data) as T;
+			if (!data) return { hit: false, value: null };
+			if (data === NULL_SENTINEL) return { hit: true, value: null };
+			return { hit: true, value: JSON.parse(data) as T };
 		} catch (err) {
 			baseLogger.warn(
 				{ err: err instanceof Error ? err.message : err, key },
 				"Cache GET error, falling back to data source",
 			);
-			return null;
+			return { hit: false, value: null };
 		}
+	}
+
+	/**
+	 * Retrieve a deserialized value from cache.
+	 */
+	async get<T>(key: string): Promise<T | null> {
+		const entry = await this.getEntry<T>(key);
+		return entry.value;
 	}
 
 	/**
@@ -157,9 +167,9 @@ class CacheService {
 		options: CacheOptions = {},
 	): Promise<T | null> {
 		// 1. Try cache
-		const cached = await this.get<T>(key);
-		if (cached !== null) {
-			return cached;
+		const cached = await this.getEntry<T>(key);
+		if (cached.hit) {
+			return cached.value;
 		}
 
 		// 2. Prevent Thundering Herd using in-flight deduplication
