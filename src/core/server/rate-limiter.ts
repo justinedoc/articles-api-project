@@ -3,6 +3,7 @@ import * as httpStatusCodes from "stoker/http-status-codes";
 import { baseLogger } from "@/core/logger";
 import { isRedisAvailable, redis } from "@/core/redis";
 import type { AppBindings } from "@/core/types";
+import { env } from "@/env";
 
 export interface RateLimiterOptions {
 	/**
@@ -30,19 +31,21 @@ export interface RateLimiterOptions {
 export function getClientIp(
 	c: Parameters<MiddlewareHandler<AppBindings>>[0],
 ): string {
-	const cfConnectingIp = c.req.header("cf-connecting-ip");
-	if (cfConnectingIp) return cfConnectingIp;
+	if (env.TRUST_PROXY) {
+		const cfConnectingIp = c.req.header("cf-connecting-ip");
+		if (cfConnectingIp) return cfConnectingIp;
 
-	const xForwardedFor = c.req.header("x-forwarded-for");
-	if (xForwardedFor) {
-		const first = xForwardedFor.split(",")[0]?.trim();
-		if (first) return first;
+		const xForwardedFor = c.req.header("x-forwarded-for");
+		if (xForwardedFor) {
+			const first = xForwardedFor.split(",")[0]?.trim();
+			if (first) return first;
+		}
+
+		const xRealIp = c.req.header("x-real-ip");
+		if (xRealIp) return xRealIp;
 	}
 
-	const xRealIp = c.req.header("x-real-ip");
-	if (xRealIp) return xRealIp;
-
-	return "127.0.0.1";
+	return c.env?.incoming?.socket.remoteAddress ?? "unknown";
 }
 
 /**

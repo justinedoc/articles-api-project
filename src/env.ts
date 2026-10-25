@@ -15,6 +15,10 @@ const envSchema = z.object({
 
 	SERVER_URL: z.url().default("http://localhost:3000"),
 	APP_URL: z.url().default("http://localhost:4321"),
+	TRUST_PROXY: z
+		.enum(["true", "false"])
+		.default("false")
+		.transform((value) => value === "true"),
 
 	DATABASE_URL: z.string(),
 	REDIS_URL: z.string().default("redis://localhost:6379"),
