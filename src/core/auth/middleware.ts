@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import * as httpStatusCodes from "stoker/http-status-codes";
-import { auth } from "@/core/lib/auth";
-import type { AppBindings } from "@/core/lib/types";
+import { auth } from "@/core/auth";
+import type { AppBindings } from "@/core/types";
 
 export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
 	const session = await auth.api.getSession({ headers: c.req.raw.headers });

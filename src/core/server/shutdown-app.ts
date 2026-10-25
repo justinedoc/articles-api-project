@@ -1,6 +1,6 @@
 import type { ServerType } from "@hono/node-server";
 
-export default async function shutdownApp(signal: string, server: ServerType) {
+export async function shutdownApp(signal: string, server: ServerType) {
 	console.log(`\nReceived ${signal}. Initiating graceful shutdown...`);
 	server.close(async (err) => {
 		if (err) {

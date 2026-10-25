@@ -2,8 +2,8 @@ import { eq } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { db } from "@/core/db";
 import { user } from "@/core/db/schema";
-import { AppError } from "@/modules/errors/index";
-import type { UpdateProfilePayload } from "./user.schema";
+import { AppError } from "@/core/errors";
+import type { UpdateProfilePayload } from "./schema";
 
 export const getProfile = async (userId: string) => {
 	const [profile] = await db.select().from(user).where(eq(user.id, userId));

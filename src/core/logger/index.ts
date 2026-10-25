@@ -4,7 +4,7 @@ import { env } from "@/env";
 
 const isDev = env.NODE_ENV === "development";
 
-const baseLogger = pino({
+export const baseLogger = pino({
 	name: "app-logger",
 	level: env.LOG_LEVEL,
 	browser: { asObject: true },

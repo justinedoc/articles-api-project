@@ -1,9 +1,11 @@
 import { Scalar } from "@scalar/hono-api-reference";
-import type { AppOpenAPI } from "@/core/lib/types";
-import { env } from "@/env";
+import type { AppOpenAPI } from "@/core/types";
 import packageJSON from "../../../package.json" with { type: "json" };
 
-export default function configureOpenAPI(router: AppOpenAPI, version: string) {
+export * from "./helpers";
+export * from "./schemas";
+
+export function configureOpenAPI(router: AppOpenAPI, version: string) {
 	router.openAPIRegistry.registerComponent("securitySchemes", "BearerAuth", {
 		type: "http",
 		scheme: "bearer",
@@ -15,14 +17,14 @@ export default function configureOpenAPI(router: AppOpenAPI, version: string) {
 		openapi: "3.1.1",
 		info: {
 			version: packageJSON.version,
-			title: `Blog API ${version.toUpperCase()}`,
+			title: `Project API ${version.toUpperCase()}`,
 		},
 		servers: [
 			{
 				url: basePath,
 				description: "Local Environment",
 			},
-			{ url: `${env.SERVER_URL}${basePath}`, description: "Production" },
+			{ url: `https://api.example.com${basePath}`, description: "Production" },
 		],
 	});
 
@@ -32,7 +34,7 @@ export default function configureOpenAPI(router: AppOpenAPI, version: string) {
 			return {
 				theme: "deepSpace",
 				layout: "classic",
-				pageTitle: `Blog API Documentation ${version.toUpperCase()}`,
+				pageTitle: `Project Documentation ${version.toUpperCase()}`,
 				sources: [
 					{
 						title: "Application API",
@@ -51,3 +53,5 @@ export default function configureOpenAPI(router: AppOpenAPI, version: string) {
 		}),
 	);
 }
+
+export default configureOpenAPI;

@@ -1,6 +1,5 @@
 import { serve } from "@hono/node-server";
-import createApp from "@/core/lib/create-app";
-import shutdownApp from "@/core/lib/shutdown-app";
+import { createApp, shutdownApp } from "@/core/server";
 import { env } from "@/env";
 import { getRoutesV1 } from "@/versions";
 

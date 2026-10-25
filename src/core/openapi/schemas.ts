@@ -1,8 +1,8 @@
 import { z } from "@hono/zod-openapi";
 
-const createMessageSchema = (
-	exampleMessage: string = "Operation successful",
-	success: boolean = true,
+export const createMessageSchema = (
+	exampleMessage = "Operation successful",
+	success = true,
 ) => {
 	return z
 		.object({
@@ -16,5 +16,3 @@ const createMessageSchema = (
 			},
 		});
 };
-
-export default createMessageSchema;

@@ -23,13 +23,6 @@ export const auth = betterAuth({
 
 	trustedOrigins: [appOrigin, apiOrigin],
 
-	session: {
-		cookieCache: {
-			enabled: true,
-			maxAge: 600, // 10 minutes cache duration
-		},
-	},
-
 	plugins: [
 		openAPI({
 			disableDefaultReference: true,

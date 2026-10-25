@@ -1,8 +1,8 @@
-import { createRouter } from "@/core/lib/create-app";
-import authRouter from "@/modules/auth/auth.router";
-import healthRouter from "@/modules/health/health.router";
-import configureOpenAPI from "@/modules/openapi";
-import usersRouter from "@/modules/user/user.router";
+import { configureOpenAPI } from "@/core/openapi";
+import { createRouter } from "@/core/server";
+import { authRouter } from "@/modules/auth";
+import { healthRouter } from "@/modules/health";
+import { usersRouter } from "@/modules/users";
 
 export function getRoutesV1() {
 	const router = createRouter();

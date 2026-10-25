@@ -22,7 +22,7 @@
 		"services:up": "docker compose -f docker-compose.dev.yml up -d",
 		"services:down": "docker compose -f docker-compose.dev.yml down",
 
-		"better-auth-gen-schema": "pnpm dlx @better-auth/cli@latest generate -y --config ./src/core/lib/auth.ts --output ./src/core/db/schema/auth.ts"
+		"better-auth-gen-schema": "pnpm dlx @better-auth/cli@latest generate -y --config ./src/core/auth/index.ts --output ./src/core/db/schema/auth.ts"
 	},
 	"dependencies": {
 		"@hono/node-server": "^2.1.5",

@@ -2,8 +2,8 @@ import type { ErrorHandler } from "hono";
 import { env } from "hono/adapter";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { INTERNAL_SERVER_ERROR } from "stoker/http-status-codes";
-import type { AppBindings } from "@/core/lib/types";
-import { AppError } from "@/modules/errors/index";
+import { AppError } from "@/core/errors/app-error";
+import type { AppBindings } from "@/core/types";
 
 export const onError: ErrorHandler<AppBindings> = (err, c) => {
 	const currentStatus =
@@ -15,7 +15,7 @@ export const onError: ErrorHandler<AppBindings> = (err, c) => {
 
 	const { NODE_ENV } = env(c);
 
-	if (c.var.logger) {
+	if (c.var?.logger) {
 		c.var.logger.error(
 			{
 				err,

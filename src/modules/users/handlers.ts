@@ -1,12 +1,12 @@
 import * as httpStatusCodes from "stoker/http-status-codes";
-import type { AppRouteHandler } from "@/core/lib/types";
-import { AppError } from "@/modules/errors/index";
+import { AppError } from "@/core/errors";
+import type { AppRouteHandler } from "@/core/types";
 import type {
 	DeleteAccountRoute,
 	GetProfileRoute,
 	UpdateProfileRoute,
-} from "./user.routes";
-import { deleteAccount, getProfile, updateProfile } from "./user.service";
+} from "./routes";
+import { deleteAccount, getProfile, updateProfile } from "./service";
 
 export const me: AppRouteHandler<GetProfileRoute> = async (c) => {
 	const user = c.get("user");

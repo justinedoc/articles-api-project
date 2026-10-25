@@ -1,7 +1,7 @@
 import * as httpStatusCodes from "stoker/http-status-codes";
-import type { AppRouteHandler } from "@/core/lib/types";
-import type { CheckRoute } from "./health.routes";
-import { getSystemHealth } from "./health.service";
+import type { AppRouteHandler } from "@/core/types";
+import type { CheckRoute } from "./routes";
+import { getSystemHealth } from "./service";
 
 export const check: AppRouteHandler<CheckRoute> = async (c) => {
 	const services = await getSystemHealth();

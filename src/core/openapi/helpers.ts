@@ -1,7 +1,7 @@
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent } from "stoker/openapi/helpers";
-import z from "zod";
-import createMessageSchema from "@/modules/openapi/openapi.schema";
+import { z } from "zod";
+import { createMessageSchema } from "@/core/openapi/schemas";
 
 /**
  * Standardized error responses used across most OpenAPI routes.

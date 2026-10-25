@@ -1,11 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
-import { authMiddleware } from "@/modules/auth/auth.middleware";
-import { selectUserSchema } from "@/modules/auth/auth.schema";
-import { defaultErrorResponses } from "@/modules/openapi/openapi.helpers";
-import createMessageSchema from "@/modules/openapi/openapi.schema";
-import { updateProfileSchema } from "./user.schema";
+import { authMiddleware } from "@/core/auth/middleware";
+import { defaultErrorResponses } from "@/core/openapi/helpers";
+import { createMessageSchema } from "@/core/openapi/schemas";
+import { selectUserSchema, updateProfileSchema } from "./schema";
 
 const tags = ["User Profile"];
 

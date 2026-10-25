@@ -6,10 +6,10 @@ import { secureHeaders } from "hono/secure-headers";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { notFound, serveEmojiFavicon } from "stoker/middlewares";
 import { prettifyError } from "zod";
-import { pinoLogger } from "@/core/lib/pino-logger";
-import type { AppBindings } from "@/core/lib/types";
+import { onError } from "@/core/errors";
+import { pinoLogger } from "@/core/logger";
+import type { AppBindings } from "@/core/types";
 import { env } from "@/env";
-import { onError } from "@/modules/errors/error.handler";
 
 export function createRouter() {
 	return new OpenAPIHono<AppBindings>({
@@ -28,7 +28,7 @@ export function createRouter() {
 	});
 }
 
-export default function createApp() {
+export function createApp() {
 	const app = createRouter().basePath("/api");
 
 	app.use("*", etag());
