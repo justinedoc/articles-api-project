@@ -11,6 +11,7 @@ import { onError } from "@/core/errors";
 import { pinoLogger } from "@/core/logger";
 import type { AppBindings } from "@/core/types";
 import { env } from "@/env";
+import { rateLimiter } from "./rate-limiter";
 
 export function createRouter() {
 	return new OpenAPIHono<AppBindings>({
@@ -82,7 +83,13 @@ export function createApp() {
 
 	app.use("*", pinoLogger);
 
-	// TODO: add ratelimiting middleware
+	app.use(
+		"*",
+		rateLimiter({
+			windowSeconds: 60,
+			maxRequests: 100,
+		}),
+	);
 
 	app.notFound(notFound);
 	app.onError(onError);

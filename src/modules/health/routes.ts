@@ -15,6 +15,7 @@ export const checkRoute = createRoute({
 				timestamp: z.string(),
 				services: z.object({
 					database: z.enum(["up", "down"]),
+					redis: z.enum(["up", "down"]).optional(),
 				}),
 			}),
 			"System is fully operational",
@@ -26,6 +27,7 @@ export const checkRoute = createRoute({
 				timestamp: z.string(),
 				services: z.object({
 					database: z.enum(["up", "down"]),
+					redis: z.enum(["up", "down"]).optional(),
 				}),
 			}),
 			"One or more dependencies are down",

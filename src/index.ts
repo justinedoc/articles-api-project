@@ -1,7 +1,11 @@
 import { serve } from "@hono/node-server";
+import { initRedis } from "@/core/redis";
 import { createApp, shutdownApp } from "@/core/server";
 import { env } from "@/env";
 import { getRoutesV1 } from "@/versions";
+
+// Initialize Redis connection
+await initRedis();
 
 const app = createApp();
 

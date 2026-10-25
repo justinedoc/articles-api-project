@@ -1,6 +1,6 @@
 import type { ServerType } from "@hono/node-server";
-
 import { pool } from "@/core/db";
+import { closeRedis } from "@/core/redis";
 
 export async function shutdownApp(signal: string, server: ServerType) {
 	console.log(`\nReceived ${signal}. Initiating graceful shutdown...`);
@@ -20,6 +20,12 @@ export async function shutdownApp(signal: string, server: ServerType) {
 			console.log("Database connection pool drained.");
 		} catch (poolErr) {
 			console.error("Error draining database pool:", poolErr);
+		}
+
+		try {
+			await closeRedis();
+		} catch (redisErr) {
+			console.error("Error closing Redis connection:", redisErr);
 		}
 
 		console.log("Graceful shutdown complete.");

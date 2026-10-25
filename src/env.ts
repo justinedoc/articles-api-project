@@ -16,6 +16,7 @@ const envSchema = z.object({
 	APP_URL: z.url().default("http://localhost:4321"),
 
 	DATABASE_URL: z.string(),
+	REDIS_URL: z.string().default("redis://localhost:6379"),
 
 	BETTER_AUTH_URL: z.url(),
 	BETTER_AUTH_SECRET: z.string(),
@@ -30,7 +31,9 @@ if (!parsedEnv.success) {
 	process.exit(1);
 }
 
-console.log("✅ ENVs validated successfully.");
+if (parsedEnv.data.NODE_ENV !== "test") {
+	console.log("✅ ENVs validated successfully.");
+}
 
 export type Env = z.infer<typeof envSchema>;
 export const env = parsedEnv.data;
