@@ -20,7 +20,7 @@ vi.mock("@/core/db", () => ({
 	},
 }));
 
-describe("Users Service Unit Tests", () => {
+describe("Users Service", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -60,7 +60,7 @@ describe("Users Service Unit Tests", () => {
 		it("should throw a 404 AppError if the user is not found", async () => {
 			vi.mocked(cache.getOrSet).mockResolvedValue(null);
 
-			await expect(getProfile("usr_not_found")).rejects.toThrowError(
+			await expect(getProfile("usr_not_found")).rejects.toThrow(
 				new AppError("User not found", httpStatusCodes.NOT_FOUND),
 			);
 		});
@@ -68,7 +68,7 @@ describe("Users Service Unit Tests", () => {
 
 	describe("updateProfile", () => {
 		it("should throw a 400 AppError if payload is empty", async () => {
-			await expect(updateProfile("usr_1", {})).rejects.toThrowError(
+			await expect(updateProfile("usr_1", {})).rejects.toThrow(
 				new AppError("No data provided to update", httpStatusCodes.BAD_REQUEST),
 			);
 		});
@@ -130,7 +130,7 @@ describe("Users Service Unit Tests", () => {
 				deleteMock as unknown as ReturnType<typeof db.delete>,
 			);
 
-			await expect(deleteAccount("usr_missing")).rejects.toThrowError(
+			await expect(deleteAccount("usr_missing")).rejects.toThrow(
 				new AppError("User not found", httpStatusCodes.NOT_FOUND),
 			);
 		});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import app from "@/index";
+import app from "../src/index";
 
 describe("E2E API Tests", () => {
 	it("should serve OpenAPI 3.1.1 documentation JSON spec at /api/v1/doc", async () => {
