@@ -1,4 +1,4 @@
-import { createRoute, z } from "@hono/zod-openapi";
+import { createRoute } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
 import { authMiddleware } from "@/core/auth/middleware";
@@ -7,12 +7,14 @@ import { createMessageSchema } from "@/core/openapi/schemas";
 import { selectUserSchema, updateProfileSchema } from "./schema";
 
 const tags = ["User Profile"];
+const security = [{ BearerAuth: [] }];
 
 export const getProfileRoute = createRoute({
 	method: "get",
 	path: "/me",
 	summary: "Get current user profile",
 	tags,
+	security,
 	middleware: [authMiddleware],
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
@@ -30,6 +32,7 @@ export const updateProfileRoute = createRoute({
 	path: "/me",
 	summary: "Update current user profile",
 	tags,
+	security,
 	middleware: [authMiddleware],
 	request: {
 		body: jsonContentRequired(updateProfileSchema, "Profile update details"),
@@ -37,7 +40,7 @@ export const updateProfileRoute = createRoute({
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Profile updated successfully", true).extend({
-				data: z.any(),
+				data: selectUserSchema,
 			}),
 			"Updated user profile",
 		),
@@ -51,6 +54,7 @@ export const deleteAccountRoute = createRoute({
 	summary: "Delete user account",
 	description: "Permanently deletes the current user and all associated data.",
 	tags,
+	security,
 	middleware: [authMiddleware],
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(

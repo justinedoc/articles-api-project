@@ -4,11 +4,18 @@ import packageJSON from "../../../package.json" with { type: "json" };
 
 export * from "./helpers";
 export * from "./schemas";
-
 export function configureOpenAPI(router: AppOpenAPI, version: string) {
 	router.openAPIRegistry.registerComponent("securitySchemes", "BearerAuth", {
 		type: "http",
 		scheme: "bearer",
+		description: "Bearer session token",
+	});
+
+	router.openAPIRegistry.registerComponent("securitySchemes", "CookieAuth", {
+		type: "apiKey",
+		in: "cookie",
+		name: "better-auth.session_token",
+		description: "Session cookie automatically sent by the browser",
 	});
 
 	const basePath = `/api/${version}`;

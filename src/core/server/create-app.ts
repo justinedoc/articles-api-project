@@ -6,6 +6,7 @@ import { secureHeaders } from "hono/secure-headers";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { notFound, serveEmojiFavicon } from "stoker/middlewares";
 import { prettifyError } from "zod";
+import { getQueryCount, withQueryCounter } from "@/core/db";
 import { onError } from "@/core/errors";
 import { pinoLogger } from "@/core/logger";
 import type { AppBindings } from "@/core/types";
@@ -68,6 +69,16 @@ export function createApp() {
 			allowHeaders: ["Content-Type", "Authorization", "Accept"],
 		}),
 	);
+
+	app.use("*", async (c, next) => {
+		await withQueryCounter(async () => {
+			await next();
+			const count = getQueryCount();
+			if (count !== undefined) {
+				c.res.headers.set("X-Query-Count", String(count));
+			}
+		});
+	});
 
 	app.use("*", pinoLogger);
 

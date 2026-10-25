@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { openAPI } from "better-auth/plugins";
+import { bearer, openAPI } from "better-auth/plugins";
 import { db } from "@/core/db";
 import * as schema from "@/core/db/schema";
 import { env } from "@/env";
@@ -24,6 +24,7 @@ export const auth = betterAuth({
 	trustedOrigins: [appOrigin, apiOrigin],
 
 	plugins: [
+		bearer(),
 		openAPI({
 			disableDefaultReference: true,
 		}),

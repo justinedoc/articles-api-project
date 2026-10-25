@@ -54,6 +54,10 @@ class QueryCountingLogger implements Logger {
 	}
 }
 
+export function withQueryCounter(fn: () => Promise<void>) {
+	return queryCounterStorage.run({ count: 0, queries: [] }, fn);
+}
+
 export const db = drizzle({
 	client: pool,
 	relations,

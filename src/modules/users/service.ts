@@ -26,9 +26,11 @@ export const updateProfile = async (
 		);
 	}
 
+	const { avatarUrl, ...rest } = payload;
+
 	const [updated] = await db
 		.update(user)
-		.set(payload)
+		.set({ ...rest, ...(avatarUrl ? { image: avatarUrl } : {}) })
 		.where(eq(user.id, userId))
 		.returning();
 

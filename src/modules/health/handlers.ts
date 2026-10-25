@@ -5,25 +5,18 @@ import { getSystemHealth } from "./service";
 
 export const check: AppRouteHandler<CheckRoute> = async (c) => {
 	const services = await getSystemHealth();
+	const timestamp = new Date().toISOString();
 
-	const isHealthy = services.database === "up";
-	const status = isHealthy ? "ok" : "error";
-
-	const statusCode = isHealthy
-		? httpStatusCodes.OK
-		: httpStatusCodes.SERVICE_UNAVAILABLE;
-
-	if (!isHealthy) {
-		c.var.logger.error({ services }, "System health check failed");
+	if (services.database === "up") {
+		return c.json(
+			{ status: "ok" as const, timestamp, services },
+			httpStatusCodes.OK,
+		);
 	}
 
+	c.var.logger.error({ services }, "System health check failed");
 	return c.json(
-		{
-			// biome-ignore lint/suspicious/noExplicitAny: <status is a literal>
-			status: status as any,
-			timestamp: new Date().toISOString(),
-			services,
-		},
-		statusCode,
+		{ status: "error" as const, timestamp, services },
+		httpStatusCodes.SERVICE_UNAVAILABLE,
 	);
 };
