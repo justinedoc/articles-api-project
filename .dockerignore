@@ -1,6 +1,15 @@
 node_modules
 dist
-.env
-.env.test
+coverage
+e2e
+tests
+.env*
+!.env.example
 .git
+.agents
+.idea
+.vscode
+.DS_Store
+*.log
+docker-compose*.yml
 README.md

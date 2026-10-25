@@ -24,7 +24,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 COPY . .
 
 RUN pnpm build && \
-    find .output -name "*.map" -type f -delete
+    find dist -name "*.map" -type f -delete 2>/dev/null || true
 
 # Stage 3: Minimal runner image
 FROM node:${NODE_VERSION} AS runner
@@ -42,12 +42,14 @@ ENV PORT=3000
 
 # Copy runtime node_modules and compiled output with correct group permissions
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/.output ./.output
 COPY --from=builder --chown=node:node /app/dist ./dist
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 
 USER node
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node -e "fetch('http://localhost:' + (process.env.PORT || 3000) + '/v1/system/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 # Wrap execution with dumb-init to intercept signals and prevent container hanging
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]

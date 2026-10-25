@@ -14,10 +14,11 @@ const routes = app.route("/v1", getRoutesV1());
 const server = serve(
 	{
 		fetch: app.fetch,
+		hostname: env.HOST,
 		port: env.PORT,
 	},
 	(info) => {
-		console.log(`Server is running on http://localhost:${info.port}`);
+		console.log(`Server is running on http://${info.address}:${info.port}`);
 	},
 );
 
