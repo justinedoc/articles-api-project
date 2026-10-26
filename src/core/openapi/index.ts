@@ -24,7 +24,7 @@ export function configureOpenAPI(router: AppOpenAPI, version: string) {
 		openapi: "3.1.1",
 		info: {
 			version: packageJSON.version,
-			title: `Project API ${version.toUpperCase()}`,
+			title: `Blog Project API ${version.toUpperCase()}`,
 		},
 		servers: [
 			{
@@ -41,7 +41,7 @@ export function configureOpenAPI(router: AppOpenAPI, version: string) {
 			return {
 				theme: "deepSpace",
 				layout: "classic",
-				pageTitle: `Project Documentation ${version.toUpperCase()}`,
+				pageTitle: `Blog Project API Documentation ${version.toUpperCase()}`,
 				sources: [
 					{
 						title: "Application API",
