@@ -20,7 +20,7 @@ export const comment = pgTable(
 			.notNull()
 			.references(() => user.id, { onDelete: "cascade" }),
 		parentId: text("parent_id").references((): AnyPgColumn => comment.id, {
-			onDelete: "cascade",
+			onDelete: "set null",
 		}),
 		body: text("body").notNull(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),

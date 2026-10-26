@@ -21,7 +21,7 @@ export function configureOpenAPI(router: AppOpenAPI, version: string) {
 	const basePath = `/api/${version}`;
 
 	router.doc("/doc", {
-		openapi: "3.1.1",
+		openapi: "3.2.1",
 		info: {
 			version: packageJSON.version,
 			title: `Article Project API ${version.toUpperCase()}`,
@@ -40,7 +40,7 @@ export function configureOpenAPI(router: AppOpenAPI, version: string) {
 		Scalar(() => {
 			return {
 				theme: "deepSpace",
-				layout: "classic",
+				layout: "modern",
 				pageTitle: `Article Project API Documentation ${version.toUpperCase()}`,
 				sources: [
 					{
