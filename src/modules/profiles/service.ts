@@ -5,6 +5,7 @@ import { cache } from "@/core/cache";
 import { db } from "@/core/db";
 import { profile, user } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
+import { generateId } from "@/core/utils";
 import { getAccountCacheKey } from "@/modules/account/service";
 import type {
 	PublicProfile,
@@ -33,6 +34,7 @@ export async function generateUniqueUsername(
 	let attempts = 0;
 
 	while (attempts < 10) {
+		// TODO: optimize... not hitting database for every username generation query
 		const [existing] = await db
 			.select({ id: profile.id })
 			.from(profile)
@@ -48,7 +50,7 @@ export async function generateUniqueUsername(
 }
 
 /**
- * Gets or initializes the author profile for a given user.
+ * Gets or initializes author profile for a given user.
  * Automatically handles seeding the profile from the auth `user` record.
  */
 export const getOrCreateProfile = async (
@@ -83,7 +85,7 @@ export const getOrCreateProfile = async (
 			const [newProfile] = await db
 				.insert(profile)
 				.values({
-					id: crypto.randomUUID(),
+					id: generateId(),
 					userId,
 					username,
 					displayName: userData.name,
@@ -139,7 +141,7 @@ export const getPublicProfileByUsername = async (
 			return record ?? null;
 		},
 		{
-			ttlSeconds: 900, // 15 minutes public cache
+			ttlSeconds: 900, // 15 mins cache
 			jitter: true,
 			cacheNull: true,
 			nullTtlSeconds: 60,

@@ -122,7 +122,6 @@ class CacheService {
 
 	/**
 	 * Invalidate all keys matching a pattern using non-blocking SCAN.
-	 * NEVER use KEYS * in production as it blocks the single-threaded Redis engine.
 	 */
 	async invalidatePattern(pattern: string): Promise<number> {
 		if (!isRedisAvailable()) return 0;

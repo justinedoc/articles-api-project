@@ -4,6 +4,10 @@ import { cache } from "@/core/cache";
 import { db } from "@/core/db";
 import { profile, user } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
+import {
+	getProfileUserCacheKey,
+	getProfileUsernameCacheKey,
+} from "@/modules/profiles/service";
 
 export const getAccountCacheKey = (userId: string) => `account:user:${userId}`;
 
@@ -15,7 +19,7 @@ export const getAccount = async (userId: string) => {
 			return record ?? null;
 		},
 		{
-			ttlSeconds: 600, // 10 minutes cache
+			ttlSeconds: 600, // 10 mins
 			jitter: true,
 			cacheNull: true,
 			nullTtlSeconds: 30,
@@ -43,11 +47,12 @@ export const deleteAccount = async (userId: string) => {
 		throw new AppError("Account not found", httpStatusCodes.NOT_FOUND);
 	}
 
-	// Invalidate both account and profile caches
+	// Invalidate account and profile caches
 	await cache.del(getAccountCacheKey(userId));
-	await cache.del(`profiles:user:${userId}`);
+	await cache.del(getProfileUserCacheKey(userId));
+
 	if (userProfile?.username) {
-		await cache.del(`profiles:username:${userProfile.username}`);
+		await cache.del(getProfileUsernameCacheKey(userProfile.username));
 	}
 
 	return deleted;
