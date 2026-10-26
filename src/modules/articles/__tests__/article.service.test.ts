@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
 import { AppError } from "@/core/errors";
-import { createArticle, transitionArticle, updateArticle } from "../service";
+import { encodeCursor } from "@/core/pagination";
+import {
+	createArticle,
+	listPublicArticles,
+	transitionArticle,
+	updateArticle,
+} from "../service";
 
 vi.mock("@/core/cache", () => ({
 	cache: { getOrSet: vi.fn(), del: vi.fn() },
@@ -89,5 +95,39 @@ describe("Article Service", () => {
 		await expect(
 			transitionArticle("article-1", "user-1", "published"),
 		).rejects.toThrow(/Cannot transition article/);
+	});
+
+	it("lists only published articles with a stable cursor", async () => {
+		const first = {
+			...draft,
+			status: "published" as const,
+			publishedAt: new Date("2026-01-03T00:00:00.000Z"),
+		};
+		const second = {
+			...draft,
+			id: "article-2",
+			status: "published" as const,
+			publishedAt: new Date("2026-01-02T00:00:00.000Z"),
+		};
+		const third = {
+			...draft,
+			id: "article-3",
+			status: "published" as const,
+			publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+		};
+		vi.mocked(db.select).mockReturnValue({
+			from: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			orderBy: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue([first, second, third]),
+		} as never);
+
+		await expect(listPublicArticles(undefined, 2)).resolves.toEqual({
+			data: [first, second],
+			nextCursor: encodeCursor({
+				createdAt: second.publishedAt,
+				id: second.id,
+			}),
+		});
 	});
 });

@@ -8,6 +8,7 @@ import type {
 	DeleteArticleRoute,
 	GetOwnedArticleRoute,
 	GetPublicArticleRoute,
+	ListPublicArticlesRoute,
 	PublishArticleRoute,
 	UpdateArticleRoute,
 } from "./routes";
@@ -16,6 +17,7 @@ import {
 	deleteArticle,
 	getOwnedArticle,
 	getPublicArticle,
+	listPublicArticles,
 	transitionArticle,
 	updateArticle,
 } from "./service";
@@ -41,6 +43,21 @@ export const getPublic: AppRouteHandler<GetPublicArticleRoute> = async (c) => {
 	const result = await getPublicArticle(c.req.valid("param").id);
 	return c.json(
 		{ success: true, message: "Article retrieved successfully", data: result },
+		httpStatusCodes.OK,
+	);
+};
+
+export const listPublic: AppRouteHandler<ListPublicArticlesRoute> = async (
+	c,
+) => {
+	const { cursor, limit } = c.req.valid("query");
+	const result = await listPublicArticles(cursor, limit);
+	return c.json(
+		{
+			success: true,
+			message: "Articles retrieved successfully",
+			data: result,
+		},
 		httpStatusCodes.OK,
 	);
 };

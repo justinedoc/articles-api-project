@@ -1,9 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
 import { article } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
+import { decodeCursor, encodeCursor } from "@/core/pagination";
 import { generateId } from "@/core/utils";
 import type {
 	ArticleCreatePayload,
@@ -80,6 +81,44 @@ export const getPublicArticle = async (id: string): Promise<SelectArticle> => {
 		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
 	}
 	return record;
+};
+
+export const listPublicArticles = async (
+	cursor: string | undefined,
+	limit: number,
+) => {
+	const conditions = [eq(article.status, "published")];
+	if (cursor) {
+		const decoded = decodeCursor(cursor);
+		conditions.push(
+			or(
+				lt(article.publishedAt, decoded.createdAt),
+				and(
+					eq(article.publishedAt, decoded.createdAt),
+					lt(article.id, decoded.id),
+				),
+			) as never,
+		);
+	}
+
+	const records = await db
+		.select()
+		.from(article)
+		.where(and(...conditions))
+		.orderBy(desc(article.publishedAt), desc(article.id))
+		.limit(limit + 1);
+
+	const hasNextPage = records.length > limit;
+	const data = hasNextPage ? records.slice(0, limit) : records;
+	const last = data[data.length - 1];
+
+	return {
+		data,
+		nextCursor:
+			hasNextPage && last?.publishedAt
+				? encodeCursor({ createdAt: last.publishedAt, id: last.id })
+				: null,
+	};
 };
 
 export const getOwnedArticle = async (

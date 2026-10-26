@@ -2,8 +2,12 @@ import { createRoute } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
 import { authMiddleware } from "@/core/auth/middleware";
-import { defaultErrorResponses } from "@/core/openapi/helpers";
+import {
+	cursorPaginationResultSchema,
+	defaultErrorResponses,
+} from "@/core/openapi/helpers";
 import { createMessageSchema } from "@/core/openapi/schemas";
+import { cursorPaginationQuerySchema } from "@/core/pagination";
 import {
 	articleCreateSchema,
 	articleIdParamSchema,
@@ -43,6 +47,23 @@ export const getPublicArticleRoute = createRoute({
 	request: { params: articleIdParamSchema },
 	responses: {
 		[httpStatusCodes.OK]: articleResponse("Article retrieved successfully"),
+		...defaultErrorResponses,
+	},
+});
+
+export const listPublicArticlesRoute = createRoute({
+	method: "get",
+	path: "/",
+	summary: "List published articles",
+	tags,
+	request: { query: cursorPaginationQuerySchema },
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema("Articles retrieved successfully", true).extend({
+				data: cursorPaginationResultSchema(articleSelectSchema),
+			}),
+			"Articles retrieved successfully",
+		),
 		...defaultErrorResponses,
 	},
 });
@@ -123,6 +144,7 @@ export const archiveArticleRoute = transitionRoute(
 
 export type CreateArticleRoute = typeof createArticleRoute;
 export type GetPublicArticleRoute = typeof getPublicArticleRoute;
+export type ListPublicArticlesRoute = typeof listPublicArticlesRoute;
 export type GetOwnedArticleRoute = typeof getOwnedArticleRoute;
 export type UpdateArticleRoute = typeof updateArticleRoute;
 export type DeleteArticleRoute = typeof deleteArticleRoute;
