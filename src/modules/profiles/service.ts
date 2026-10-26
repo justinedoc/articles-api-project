@@ -24,29 +24,12 @@ export const getProfileUsernameCacheKey = (username: string) =>
 export async function generateUniqueUsername(
 	baseString: string,
 ): Promise<string> {
-	const sanitized =
+	return (
 		baseString
 			.split("@")[0]
 			.toLowerCase()
-			.replace(/[^a-z0-9_-]/g, "") || "user";
-
-	let candidate = sanitized;
-	let attempts = 0;
-
-	while (attempts < 10) {
-		// TODO: optimize... not hitting database for every username generation query
-		const [existing] = await db
-			.select({ id: profile.id })
-			.from(profile)
-			.where(eq(profile.username, candidate));
-
-		if (!existing) return candidate;
-
-		attempts++;
-		candidate = `${sanitized}_${crypto.randomBytes(2).toString("hex")}`;
-	}
-
-	return `${sanitized}_${Date.now()}`;
+			.replace(/[^a-z0-9_-]/g, "") || "user"
+	);
 }
 
 /**
@@ -78,23 +61,38 @@ export const getOrCreateProfile = async (
 				return null;
 			}
 
-			const username = await generateUniqueUsername(
+			const baseUsername = await generateUniqueUsername(
 				userData.name || userData.email,
 			);
 
-			const [newProfile] = await db
-				.insert(profile)
-				.values({
-					id: generateId(),
-					userId,
-					username,
-					displayName: userData.name,
-					avatarUrl: userData.image,
-					socialLinks: {},
-				})
-				.returning();
+			for (let attempt = 0; attempt < 10; attempt++) {
+				const username =
+					attempt === 0
+						? baseUsername
+						: `${baseUsername}_${crypto.randomBytes(2).toString("hex")}`;
+				const [newProfile] = await db
+					.insert(profile)
+					.values({
+						id: generateId(),
+						userId,
+						username,
+						displayName: userData.name,
+						avatarUrl: userData.image,
+						socialLinks: {},
+					})
+					.onConflictDoNothing()
+					.returning();
 
-			return newProfile ?? null;
+				if (newProfile) return newProfile;
+
+				const [existingProfile] = await db
+					.select()
+					.from(profile)
+					.where(eq(profile.userId, userId));
+				if (existingProfile) return existingProfile;
+			}
+
+			return null;
 		},
 		{
 			ttlSeconds: 600,
@@ -174,31 +172,6 @@ export const updateProfile = async (
 	// Ensure profile exists first
 	const currentProfile = await getOrCreateProfile(userId);
 
-	// Check username collision if updating username
-	if (
-		payload.username &&
-		payload.username.toLowerCase() !== currentProfile.username.toLowerCase()
-	) {
-		const normalizedNewUsername = payload.username.toLowerCase();
-		const [collision] = await db
-			.select({ id: profile.id })
-			.from(profile)
-			.where(
-				and(
-					eq(profile.username, normalizedNewUsername),
-					ne(profile.userId, userId),
-				),
-			);
-
-		if (collision) {
-			throw new AppError(
-				"Username is already taken by another author",
-				httpStatusCodes.CONFLICT,
-			);
-		}
-	}
-
-	// 1. Sync name & image to user table to avoid desynchronization with Better-Auth sessions
 	const userUpdates: { name?: string; image?: string | null } = {};
 	if (payload.displayName !== undefined) {
 		userUpdates.name = payload.displayName;
@@ -207,33 +180,61 @@ export const updateProfile = async (
 		userUpdates.image = payload.avatarUrl;
 	}
 
-	if (Object.keys(userUpdates).length > 0) {
-		await db.update(user).set(userUpdates).where(eq(user.id, userId));
-		await cache.del(getAccountCacheKey(userId));
-	}
-
-	// 2. Update profile table
 	const profileUpdates = {
 		...payload,
 		...(payload.username ? { username: payload.username.toLowerCase() } : {}),
 	};
 
-	const [updated] = await db
-		.update(profile)
-		.set(profileUpdates)
-		.where(eq(profile.userId, userId))
-		.returning();
+	const updated = await db.transaction(async (tx) => {
+		if (
+			payload.username &&
+			payload.username.toLowerCase() !== currentProfile.username.toLowerCase()
+		) {
+			const [collision] = await tx
+				.select({ id: profile.id })
+				.from(profile)
+				.where(
+					and(
+						eq(profile.username, payload.username.toLowerCase()),
+						ne(profile.userId, userId),
+					),
+				);
+
+			if (collision) {
+				throw new AppError(
+					"Username is already taken by another author",
+					httpStatusCodes.CONFLICT,
+				);
+			}
+		}
+
+		if (Object.keys(userUpdates).length > 0) {
+			await tx.update(user).set(userUpdates).where(eq(user.id, userId));
+		}
+
+		const [updatedProfile] = await tx
+			.update(profile)
+			.set(profileUpdates)
+			.where(eq(profile.userId, userId))
+			.returning();
+
+		return updatedProfile;
+	});
 
 	if (!updated) {
 		throw new AppError("Profile not found", httpStatusCodes.NOT_FOUND);
 	}
 
-	// 3. Invalidate Redis caches
-	await cache.del(getProfileUserCacheKey(userId));
-	await cache.del(getProfileUsernameCacheKey(currentProfile.username));
-	if (updated.username !== currentProfile.username) {
-		await cache.del(getProfileUsernameCacheKey(updated.username));
-	}
+	await Promise.all([
+		Object.keys(userUpdates).length > 0
+			? cache.del(getAccountCacheKey(userId))
+			: Promise.resolve(),
+		cache.del(getProfileUserCacheKey(userId)),
+		cache.del(getProfileUsernameCacheKey(currentProfile.username)),
+		updated.username !== currentProfile.username
+			? cache.del(getProfileUsernameCacheKey(updated.username))
+			: Promise.resolve(),
+	]);
 
 	return updated;
 };

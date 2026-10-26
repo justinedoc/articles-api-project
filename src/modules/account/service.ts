@@ -34,26 +34,31 @@ export const getAccount = async (userId: string) => {
 };
 
 export const deleteAccount = async (userId: string) => {
-	const [[userProfile], [deleted]] = await Promise.all([
-		db
+	const { userProfile, deleted } = await db.transaction(async (tx) => {
+		const [userProfile] = await tx
 			.select({ username: profile.username })
 			.from(profile)
-			.where(eq(profile.userId, userId)),
+			.where(eq(profile.userId, userId));
+		const [deleted] = await tx
+			.delete(user)
+			.where(eq(user.id, userId))
+			.returning();
 
-		db.delete(user).where(eq(user.id, userId)).returning(),
-	]);
+		return { userProfile, deleted };
+	});
 
 	if (!deleted) {
 		throw new AppError("Account not found", httpStatusCodes.NOT_FOUND);
 	}
 
 	// Invalidate account and profile caches
-	await cache.del(getAccountCacheKey(userId));
-	await cache.del(getProfileUserCacheKey(userId));
-
-	if (userProfile?.username) {
-		await cache.del(getProfileUsernameCacheKey(userProfile.username));
-	}
+	await Promise.all([
+		cache.del(getAccountCacheKey(userId)),
+		cache.del(getProfileUserCacheKey(userId)),
+		userProfile?.username
+			? cache.del(getProfileUsernameCacheKey(userProfile.username))
+			: Promise.resolve(),
+	]);
 
 	return deleted;
 };

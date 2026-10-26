@@ -21,12 +21,20 @@ vi.mock("@/core/db", () => ({
 		select: vi.fn(),
 		insert: vi.fn(),
 		update: vi.fn(),
+		transaction: vi.fn(),
 	},
 }));
 
 describe("Profiles Service", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback({
+				select: db.select,
+				insert: db.insert,
+				update: db.update,
+			} as never),
+		);
 	});
 
 	describe("getOrCreateProfile", () => {
@@ -118,6 +126,7 @@ describe("Profiles Service", () => {
 
 			const insertMock = {
 				values: vi.fn().mockReturnThis(),
+				onConflictDoNothing: vi.fn().mockReturnThis(),
 				returning: vi.fn().mockResolvedValue([createdProfile]),
 			};
 			vi.mocked(db.insert).mockReturnValue(

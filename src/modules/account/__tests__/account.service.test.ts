@@ -16,12 +16,19 @@ vi.mock("@/core/db", () => ({
 	db: {
 		select: vi.fn(),
 		delete: vi.fn(),
+		transaction: vi.fn(),
 	},
 }));
 
 describe("Account Service", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback({
+				select: db.select,
+				delete: db.delete,
+			} as never),
+		);
 	});
 
 	describe("getAccount", () => {

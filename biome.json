@@ -6,7 +6,8 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": false
+		"ignoreUnknown": false,
+		"includes": ["**", "!src/core/db/migrations/**/snapshot.json"]
 	},
 	"formatter": {
 		"enabled": true,
