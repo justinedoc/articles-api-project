@@ -1,0 +1,1 @@
+CREATE INDEX "article_search_idx" ON "article" USING gin (to_tsvector('english', "title" || ' ' || "body"));

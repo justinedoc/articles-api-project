@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { generateId } from "@/core/utils";
 import { user } from "./auth";
@@ -33,5 +34,9 @@ export const article = pgTable(
 			table.publishedAt,
 		),
 		index("article_author_id_idx").on(table.authorId),
+		index("article_search_idx").using(
+			"gin",
+			sql`to_tsvector('english', ${table.title} || ' ' || ${table.body})`,
+		),
 	],
 );

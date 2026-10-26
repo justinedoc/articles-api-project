@@ -7,10 +7,10 @@ import {
 	defaultErrorResponses,
 } from "@/core/openapi/helpers";
 import { createMessageSchema } from "@/core/openapi/schemas";
-import { cursorPaginationQuerySchema } from "@/core/pagination";
 import {
 	articleCreateSchema,
 	articleIdParamSchema,
+	articleListQuerySchema,
 	articleSelectSchema,
 	articleUpdateSchema,
 } from "./schema";
@@ -56,7 +56,7 @@ export const listPublicArticlesRoute = createRoute({
 	path: "/",
 	summary: "List published articles",
 	tags,
-	request: { query: cursorPaginationQuerySchema },
+	request: { query: articleListQuerySchema },
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Articles retrieved successfully", true).extend({

@@ -50,8 +50,8 @@ export const getPublic: AppRouteHandler<GetPublicArticleRoute> = async (c) => {
 export const listPublic: AppRouteHandler<ListPublicArticlesRoute> = async (
 	c,
 ) => {
-	const { cursor, limit } = c.req.valid("query");
-	const result = await listPublicArticles(cursor, limit);
+	const { cursor, limit, tag, search } = c.req.valid("query");
+	const result = await listPublicArticles(cursor, limit, tag, search);
 	return c.json(
 		{
 			success: true,

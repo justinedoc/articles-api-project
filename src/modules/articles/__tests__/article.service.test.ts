@@ -21,6 +21,7 @@ vi.mock("@/core/db", () => ({
 		insert: vi.fn(),
 		update: vi.fn(),
 		delete: vi.fn(),
+		transaction: vi.fn(),
 	},
 }));
 
@@ -58,6 +59,49 @@ describe("Article Service", () => {
 		expect(db.insert).toHaveBeenCalled();
 	});
 
+	it("normalizes, deduplicates, and persists article tags atomically", async () => {
+		const tagged = { ...draft };
+		const transaction = {
+			insert: vi
+				.fn()
+				.mockReturnValueOnce({
+					values: vi.fn().mockReturnThis(),
+					returning: vi.fn().mockResolvedValue([tagged]),
+				})
+				.mockReturnValueOnce({
+					values: vi.fn().mockReturnThis(),
+					onConflictDoNothing: vi.fn().mockReturnThis(),
+					returning: vi
+						.fn()
+						.mockResolvedValue([{ id: "tag-1", name: "typescript" }]),
+				})
+				.mockReturnValueOnce({
+					values: vi.fn().mockResolvedValue([]),
+				}),
+			delete: vi.fn().mockReturnValue({
+				where: vi.fn().mockResolvedValue([]),
+			}),
+			select: vi.fn().mockReturnValue({
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([]),
+			}),
+		};
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback(transaction as never),
+		);
+
+		await expect(
+			createArticle("user-1", {
+				title: "Tagged",
+				body: "Body",
+				tags: [" TypeScript ", "typescript"],
+			}),
+		).resolves.toEqual(tagged);
+
+		expect(transaction.insert).toHaveBeenCalledTimes(3);
+		expect(transaction.insert.mock.calls[1][0]).toBeDefined();
+	});
+
 	it("rejects updates from users who do not own the article", async () => {
 		vi.mocked(db.select).mockReturnValue({
 			from: vi.fn().mockReturnThis(),
@@ -69,6 +113,38 @@ describe("Article Service", () => {
 		).rejects.toThrow(
 			new AppError("You do not own this article", httpStatusCodes.FORBIDDEN),
 		);
+	});
+
+	it("replaces an owner's tags when updating an article", async () => {
+		const updated = { ...draft, title: "Changed" };
+		vi.mocked(db.select).mockReturnValue({
+			from: vi.fn().mockReturnThis(),
+			where: vi.fn().mockResolvedValue([draft]),
+		} as never);
+		const transaction = {
+			update: vi.fn().mockReturnValue({
+				set: vi.fn().mockReturnThis(),
+				where: vi.fn().mockReturnThis(),
+				returning: vi.fn().mockResolvedValue([updated]),
+			}),
+			delete: vi.fn().mockReturnValue({
+				where: vi.fn().mockResolvedValue([]),
+			}),
+			select: vi.fn().mockReturnValue({
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([]),
+			}),
+			insert: vi.fn(),
+		};
+		vi.mocked(db.transaction).mockImplementation(async (callback) =>
+			callback(transaction as never),
+		);
+
+		await expect(
+			updateArticle("article-1", "user-1", { title: "Changed", tags: [] }),
+		).resolves.toEqual(updated);
+		expect(transaction.delete).toHaveBeenCalled();
+		expect(cache.del).toHaveBeenCalledWith("articles:id:article-1");
 	});
 
 	it("publishes drafts and rejects publishing an already published article", async () => {
@@ -129,5 +205,48 @@ describe("Article Service", () => {
 				id: second.id,
 			}),
 		});
+	});
+
+	it("filters public articles by a normalized tag", async () => {
+		const taggedArticle = {
+			...draft,
+			status: "published" as const,
+			publishedAt: new Date("2026-01-03T00:00:00.000Z"),
+		};
+		const chain = {
+			from: vi.fn().mockReturnThis(),
+			innerJoin: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			orderBy: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue([{ article: taggedArticle }]),
+		};
+		vi.mocked(db.select).mockReturnValue({
+			...chain,
+		} as never);
+
+		await expect(
+			listPublicArticles(undefined, 20, " TypeScript "),
+		).resolves.toEqual({ data: [taggedArticle], nextCursor: null });
+		expect(chain.innerJoin).toHaveBeenCalledTimes(2);
+	});
+
+	it("applies full-text search to public article discovery", async () => {
+		const matchingArticle = {
+			...draft,
+			status: "published" as const,
+			publishedAt: new Date("2026-01-03T00:00:00.000Z"),
+		};
+		const chain = {
+			from: vi.fn().mockReturnThis(),
+			where: vi.fn().mockReturnThis(),
+			orderBy: vi.fn().mockReturnThis(),
+			limit: vi.fn().mockResolvedValue([matchingArticle]),
+		};
+		vi.mocked(db.select).mockReturnValue(chain as never);
+
+		await expect(
+			listPublicArticles(undefined, 20, undefined, " distributed systems "),
+		).resolves.toEqual({ data: [matchingArticle], nextCursor: null });
+		expect(chain.where).toHaveBeenCalled();
 	});
 });

@@ -37,9 +37,25 @@ export const relations = defineRelations(schema, (r) => ({
 
 	article: {
 		comments: r.many.comment(),
+		tags: r.many.articleTag(),
 		author: r.one.user({
 			from: r.article.authorId,
 			to: r.user.id,
+		}),
+	},
+
+	tag: {
+		articles: r.many.articleTag(),
+	},
+
+	articleTag: {
+		article: r.one.article({
+			from: r.articleTag.articleId,
+			to: r.article.id,
+		}),
+		tag: r.one.tag({
+			from: r.articleTag.tagId,
+			to: r.tag.id,
 		}),
 	},
 

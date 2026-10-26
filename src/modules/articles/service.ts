@@ -1,8 +1,8 @@
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
-import { article } from "@/core/db/schema";
+import { article, articleTag, tag } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
 import { decodeCursor, encodeCursor } from "@/core/pagination";
 import { generateId } from "@/core/utils";
@@ -21,6 +21,47 @@ const slugify = (title: string) =>
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-|-$/g, "")
 		.slice(0, 80) || "article";
+
+const normalizeTags = (tags: string[] | undefined) => [
+	...new Set((tags ?? []).map((value) => value.trim().toLowerCase())),
+];
+
+type DatabaseExecutor =
+	| typeof db
+	| Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const syncArticleTags = async (
+	tx: DatabaseExecutor,
+	articleId: string,
+	names: string[],
+) => {
+	await tx.delete(articleTag).where(eq(articleTag.articleId, articleId));
+	if (names.length === 0) return;
+
+	const existing = await tx
+		.select()
+		.from(tag)
+		.where(or(...names.map((name) => eq(tag.name, name))));
+	const existingByName = new Map(
+		existing.map((record) => [record.name, record]),
+	);
+	const missing = names.filter((name) => !existingByName.has(name));
+	if (missing.length > 0) {
+		const created = await tx
+			.insert(tag)
+			.values(missing.map((name) => ({ name })))
+			.onConflictDoNothing()
+			.returning();
+		for (const record of created) existingByName.set(record.name, record);
+	}
+
+	await tx.insert(articleTag).values(
+		names.map((name) => ({
+			articleId,
+			tagId: existingByName.get(name)?.id ?? "",
+		})),
+	);
+};
 
 const getArticleOrThrow = async (id: string) => {
 	const [record] = await db.select().from(article).where(eq(article.id, id));
@@ -44,19 +85,31 @@ export const createArticle = async (
 	payload: ArticleCreatePayload,
 ): Promise<SelectArticle> => {
 	const id = generateId();
-	const [created] = await db
-		.insert(article)
-		.values({
-			id,
-			authorId,
-			title: payload.title,
-			slug: `${slugify(payload.title)}-${id.slice(0, 8)}`,
-			excerpt: payload.excerpt ?? null,
-			body: payload.body,
-			status: "draft",
-			publishedAt: null,
-		})
-		.returning();
+	const values = {
+		id,
+		authorId,
+		title: payload.title,
+		slug: `${slugify(payload.title)}-${id.slice(0, 8)}`,
+		excerpt: payload.excerpt ?? null,
+		body: payload.body,
+		status: "draft" as const,
+		publishedAt: null,
+	};
+	const names = normalizeTags(payload.tags);
+	const [created] =
+		names.length > 0
+			? [
+					await db.transaction(async (transaction) => {
+						const [record] = await transaction
+							.insert(article)
+							.values(values)
+							.returning();
+						if (!record) throw new AppError("Article could not be created");
+						await syncArticleTags(transaction, id, names);
+						return record;
+					}),
+				]
+			: await db.insert(article).values(values).returning();
 
 	if (!created) {
 		throw new AppError("Article could not be created");
@@ -86,8 +139,17 @@ export const getPublicArticle = async (id: string): Promise<SelectArticle> => {
 export const listPublicArticles = async (
 	cursor: string | undefined,
 	limit: number,
+	tagName?: string,
+	searchTerm?: string,
 ) => {
 	const conditions = [eq(article.status, "published")];
+	const normalizedTag = tagName?.trim().toLowerCase();
+	const normalizedSearch = searchTerm?.trim();
+	if (normalizedSearch) {
+		conditions.push(
+			sql`to_tsvector('english', ${article.title} || ' ' || ${article.body}) @@ plainto_tsquery('english', ${normalizedSearch})` as never,
+		);
+	}
 	if (cursor) {
 		const decoded = decodeCursor(cursor);
 		conditions.push(
@@ -101,12 +163,26 @@ export const listPublicArticles = async (
 		);
 	}
 
-	const records = await db
-		.select()
-		.from(article)
-		.where(and(...conditions))
-		.orderBy(desc(article.publishedAt), desc(article.id))
-		.limit(limit + 1);
+	const records = normalizedTag
+		? (
+				await db
+					.select({ article })
+					.from(article)
+					.innerJoin(articleTag, eq(articleTag.articleId, article.id))
+					.innerJoin(
+						tag,
+						and(eq(tag.id, articleTag.tagId), eq(tag.name, normalizedTag)),
+					)
+					.where(and(...conditions))
+					.orderBy(desc(article.publishedAt), desc(article.id))
+					.limit(limit + 1)
+			).map((record) => record.article)
+		: await db
+				.select()
+				.from(article)
+				.where(and(...conditions))
+				.orderBy(desc(article.publishedAt), desc(article.id))
+				.limit(limit + 1);
 
 	const hasNextPage = records.length > limit;
 	const data = hasNextPage ? records.slice(0, limit) : records;
@@ -144,12 +220,27 @@ export const updateArticle = async (
 
 	const current = await getArticleOrThrow(id);
 	assertOwner(current, userId);
+	const { tags: requestedTags, ...articlePayload } = payload;
 
-	const [updated] = await db
-		.update(article)
-		.set(payload)
-		.where(eq(article.id, id))
-		.returning();
+	const updated = requestedTags
+		? await db.transaction(async (transaction) => {
+				const [record] = await transaction
+					.update(article)
+					.set(articlePayload)
+					.where(eq(article.id, id))
+					.returning();
+				if (record) {
+					await syncArticleTags(transaction, id, normalizeTags(requestedTags));
+				}
+				return record;
+			})
+		: (
+				await db
+					.update(article)
+					.set(articlePayload)
+					.where(eq(article.id, id))
+					.returning()
+			)[0];
 
 	if (!updated) {
 		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
