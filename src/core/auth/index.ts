@@ -30,6 +30,26 @@ export const auth = betterAuth({
 		}),
 	],
 
+	databaseHooks: {
+		user: {
+			create: {
+				after: async (createdUser) => {
+					try {
+						const { getOrCreateProfile } = await import(
+							"@/modules/profiles/service"
+						);
+						await getOrCreateProfile(createdUser.id);
+					} catch (err) {
+						console.error(
+							"Failed to auto-create profile on user registration:",
+							err,
+						);
+					}
+				},
+			},
+		},
+	},
+
 	appName: "Article Api",
 });
 

@@ -12,7 +12,9 @@ describe("E2E API Tests", () => {
 		expect(spec.info.title).toContain("Project API");
 		expect(spec.components?.securitySchemes?.BearerAuth).toBeDefined();
 		expect(spec.paths["/system/health"]).toBeDefined();
-		expect(spec.paths["/users/me"]).toBeDefined();
+		expect(spec.paths["/account/me"]).toBeDefined();
+		expect(spec.paths["/profiles/me"]).toBeDefined();
+		expect(spec.paths["/profiles/{username}"]).toBeDefined();
 	});
 
 	it("should serve Scalar Reference HTML documentation UI at /api/v1/reference", async () => {
