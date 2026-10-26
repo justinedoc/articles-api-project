@@ -1,16 +1,16 @@
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: blog-api-dev-db
+    container_name: article-api-dev-db
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: blog-api
+      POSTGRES_DB: article-api
     volumes:
-      - blog_api_pg_data:/var/lib/postgresql/data
+      - article_api_pg_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -19,12 +19,12 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: blog-api-dev-redis
+    container_name: article-api-dev-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
-      - blog_api_redis_data:/data
+      - article_api_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -32,5 +32,5 @@ services:
       retries: 5
 
 volumes:
-  blog_api_pg_data:
-  blog_api_redis_data:
+  article_api_pg_data:
+  article_api_redis_data:

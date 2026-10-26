@@ -30,7 +30,7 @@ export const auth = betterAuth({
 		}),
 	],
 
-	appName: "Blog Api",
+	appName: "Article Api",
 });
 
 type AuthType = typeof auth;
