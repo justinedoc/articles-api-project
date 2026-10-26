@@ -3,27 +3,9 @@ import * as httpStatusCodes from "stoker/http-status-codes";
 import { db } from "@/core/db";
 import { article, comment } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
+import { decodeCursor, encodeCursor } from "@/core/pagination";
 import { generateId } from "@/core/utils";
 import type { CommentCreatePayload, SelectComment } from "./schema";
-
-const encodeCursor = (record: SelectComment) =>
-	Buffer.from(`${record.createdAt.toISOString()}|${record.id}`).toString(
-		"base64url",
-	);
-
-const decodeCursor = (cursor: string) => {
-	const decoded = Buffer.from(cursor, "base64url").toString("utf8");
-	const separator = decoded.indexOf("|");
-	if (separator <= 0) {
-		throw new AppError("Invalid comment cursor", httpStatusCodes.BAD_REQUEST);
-	}
-	const createdAt = new Date(decoded.slice(0, separator));
-	const id = decoded.slice(separator + 1);
-	if (Number.isNaN(createdAt.getTime()) || !id) {
-		throw new AppError("Invalid comment cursor", httpStatusCodes.BAD_REQUEST);
-	}
-	return { createdAt, id };
-};
 
 const assertPublishedArticle = async (articleId: string) => {
 	const [record] = await db

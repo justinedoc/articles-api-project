@@ -2,7 +2,10 @@ import { createRoute, z } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
 import { authMiddleware } from "@/core/auth/middleware";
-import { defaultErrorResponses } from "@/core/openapi/helpers";
+import {
+	cursorPaginationResultSchema,
+	defaultErrorResponses,
+} from "@/core/openapi/helpers";
 import { createMessageSchema } from "@/core/openapi/schemas";
 import {
 	articleCommentsParamSchema,
@@ -32,10 +35,7 @@ export const listCommentsRoute = createRoute({
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Comments retrieved successfully", true).extend({
-				data: z.object({
-					data: z.array(commentSelectSchema),
-					nextCursor: z.string().nullable(),
-				}),
+				data: cursorPaginationResultSchema(commentSelectSchema),
 			}),
 			"Comments for an article",
 		),

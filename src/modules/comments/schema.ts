@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { createSchemaFactory } from "drizzle-orm/zod";
 import { comment } from "@/core/db/schema";
+import { cursorPaginationQuerySchema } from "@/core/pagination";
 
 const { createSelectSchema } = createSchemaFactory({ zodInstance: z });
 
@@ -16,10 +17,7 @@ export const commentIdParamSchema = z.object({
 export const articleCommentsParamSchema = z.object({
 	articleId: z.string().min(1),
 });
-export const commentListQuerySchema = z.object({
-	cursor: z.string().min(1).optional(),
-	limit: z.coerce.number().int().min(1).max(100).default(20),
-});
+export const commentListQuerySchema = cursorPaginationQuerySchema;
 
 export type CommentCreatePayload = z.infer<typeof commentCreateSchema>;
 export type SelectComment = z.infer<typeof commentSelectSchema>;
