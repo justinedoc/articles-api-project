@@ -23,6 +23,7 @@ export const comment = pgTable(
 			onDelete: "set null",
 		}),
 		body: text("body").notNull(),
+		deletedAt: timestamp("deleted_at"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()

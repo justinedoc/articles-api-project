@@ -1,0 +1,2 @@
+ALTER TABLE "comment" ADD COLUMN "deleted_at" timestamp;--> statement-breakpoint
+ALTER TABLE "comment" DROP CONSTRAINT "comment_parent_id_comment_id_fkey", ADD CONSTRAINT "comment_parent_id_comment_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "comment"("id") ON DELETE SET NULL;

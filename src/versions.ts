@@ -3,6 +3,7 @@ import { createRouter } from "@/core/server";
 import { accountRouter } from "@/modules/account";
 import { articlesRouter } from "@/modules/articles";
 import { authRouter } from "@/modules/auth";
+import { commentsRouter } from "@/modules/comments";
 import { healthRouter } from "@/modules/health";
 import { profilesRouter } from "@/modules/profiles";
 
@@ -14,6 +15,7 @@ export function getRoutesV1() {
 	router.route("/account", accountRouter);
 	router.route("/profiles", profilesRouter);
 	router.route("/articles", articlesRouter);
+	router.route("/", commentsRouter);
 
 	configureOpenAPI(router, "v1");
 

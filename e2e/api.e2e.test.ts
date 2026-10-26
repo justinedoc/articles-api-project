@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import app from "../src/index";
 
 describe("E2E API Tests", () => {
-	it("should serve OpenAPI 3.1.1 documentation JSON spec at /api/v1/doc", async () => {
+	it("should serve OpenAPI 3.2.1 documentation JSON spec at /api/v1/doc", async () => {
 		const res = await app.request("/api/v1/doc");
 		expect(res.status).toBe(200);
 
 		const spec = await res.json();
-		expect(spec.openapi).toBe("3.1.1");
+		expect(spec.openapi).toBe("3.2.1");
 		expect(spec.info).toBeDefined();
 		expect(spec.info.title).toContain("Project API");
 		expect(spec.components?.securitySchemes?.BearerAuth).toBeDefined();
