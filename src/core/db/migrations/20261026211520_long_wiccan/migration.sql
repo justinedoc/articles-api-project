@@ -1,0 +1,2 @@
+ALTER TABLE "article" ALTER COLUMN "published_at" SET DATA TYPE timestamp(3) USING "published_at"::timestamp(3);--> statement-breakpoint
+ALTER TABLE "comment" ALTER COLUMN "created_at" SET DATA TYPE timestamp(3) USING "created_at"::timestamp(3);

@@ -8,8 +8,10 @@ import type {
 	DeleteArticleRoute,
 	GetOwnedArticleRoute,
 	GetPublicArticleRoute,
+	LikeArticleRoute,
 	ListPublicArticlesRoute,
 	PublishArticleRoute,
+	UnlikeArticleRoute,
 	UpdateArticleRoute,
 } from "./routes";
 import {
@@ -17,8 +19,10 @@ import {
 	deleteArticle,
 	getOwnedArticle,
 	getPublicArticle,
+	likeArticle,
 	listPublicArticles,
 	transitionArticle,
+	unlikeArticle,
 	updateArticle,
 } from "./service";
 
@@ -123,6 +127,28 @@ export const archive: AppRouteHandler<ArchiveArticleRoute> = async (c) => {
 			message: "Article status updated successfully",
 			data: result,
 		},
+		httpStatusCodes.OK,
+	);
+};
+
+export const like: AppRouteHandler<LikeArticleRoute> = async (c) => {
+	const result = await likeArticle(
+		c.req.valid("param").id,
+		authenticatedUser(c).id,
+	);
+	return c.json(
+		{ success: true, message: "Article liked successfully", data: result },
+		httpStatusCodes.OK,
+	);
+};
+
+export const unlike: AppRouteHandler<UnlikeArticleRoute> = async (c) => {
+	const result = await unlikeArticle(
+		c.req.valid("param").id,
+		authenticatedUser(c).id,
+	);
+	return c.json(
+		{ success: true, message: "Article unliked successfully", data: result },
 		httpStatusCodes.OK,
 	);
 };

@@ -1,8 +1,8 @@
-import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, lt, or, sql } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
-import { article, articleTag, tag } from "@/core/db/schema";
+import { article, articleLike, articleTag, tag } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
 import { decodeCursor, encodeCursor } from "@/core/pagination";
 import { generateId } from "@/core/utils";
@@ -80,6 +80,30 @@ const assertOwner = (record: SelectArticle, userId: string) => {
 	}
 };
 
+const assertPublished = async (articleId: string) => {
+	const [record] = await db
+		.select({ id: article.id })
+		.from(article)
+		.where(and(eq(article.id, articleId), eq(article.status, "published")));
+	if (!record) {
+		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
+	}
+};
+
+const getLikeResult = async (articleId: string, userId: string) => {
+	const [likes] = await db
+		.select({ count: count() })
+		.from(articleLike)
+		.where(eq(articleLike.articleId, articleId));
+	const [userLike] = await db
+		.select({ articleId: articleLike.articleId })
+		.from(articleLike)
+		.where(
+			and(eq(articleLike.articleId, articleId), eq(articleLike.userId, userId)),
+		);
+	return { count: Number(likes?.count ?? 0), liked: Boolean(userLike) };
+};
+
 export const createArticle = async (
 	authorId: string,
 	payload: ArticleCreatePayload,
@@ -134,6 +158,25 @@ export const getPublicArticle = async (id: string): Promise<SelectArticle> => {
 		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
 	}
 	return record;
+};
+
+export const likeArticle = async (articleId: string, userId: string) => {
+	await assertPublished(articleId);
+	await db
+		.insert(articleLike)
+		.values({ articleId, userId })
+		.onConflictDoNothing();
+	return getLikeResult(articleId, userId);
+};
+
+export const unlikeArticle = async (articleId: string, userId: string) => {
+	await assertPublished(articleId);
+	await db
+		.delete(articleLike)
+		.where(
+			and(eq(articleLike.articleId, articleId), eq(articleLike.userId, userId)),
+		);
+	return getLikeResult(articleId, userId);
 };
 
 export const listPublicArticles = async (

@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthSession } from "@/core/auth";
 import { auth } from "@/core/auth";
-import { createApp } from "@/core/server";
+import { createMockSession, createTestApp } from "@/core/test-utils";
 import { accountRouter } from "../index";
 import * as accountService from "../service";
 
 describe("Account Routes Integration Tests", () => {
-	const app = createApp().route("/account", accountRouter);
+	const app = createTestApp("/account", accountRouter);
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -26,32 +25,14 @@ describe("Account Routes Integration Tests", () => {
 	});
 
 	it("should return 200 OK with account details when authenticated user requests GET /account/me", async () => {
-		const mockAccount = {
+		const mockSession = createMockSession({
 			id: "usr_123",
 			name: "Jane Doe",
 			email: "jane@example.com",
-			emailVerified: true,
-			image: null,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-		};
-
-		const mockSession: AuthSession = {
-			session: {
-				id: "sess_123",
-				userId: "usr_123",
-				expiresAt: new Date(Date.now() + 3600000),
-				token: "token_123",
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				ipAddress: null,
-				userAgent: null,
-			},
-			user: mockAccount,
-		};
+		});
 
 		vi.spyOn(auth.api, "getSession").mockResolvedValue(mockSession);
-		vi.spyOn(accountService, "getAccount").mockResolvedValue(mockAccount);
+		vi.spyOn(accountService, "getAccount").mockResolvedValue(mockSession.user);
 
 		const res = await app.request("/api/account/me", {
 			method: "GET",
@@ -66,38 +47,16 @@ describe("Account Routes Integration Tests", () => {
 	});
 
 	it("should return 200 OK when authenticated user requests DELETE /account/me", async () => {
-		const mockSession: AuthSession = {
-			session: {
-				id: "sess_123",
-				userId: "usr_123",
-				expiresAt: new Date(Date.now() + 3600000),
-				token: "token_123",
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				ipAddress: null,
-				userAgent: null,
-			},
-			user: {
-				id: "usr_123",
-				name: "Jane Doe",
-				email: "jane@example.com",
-				emailVerified: true,
-				image: null,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			},
-		};
-
-		vi.spyOn(auth.api, "getSession").mockResolvedValue(mockSession);
-		vi.spyOn(accountService, "deleteAccount").mockResolvedValue({
+		const mockSession = createMockSession({
 			id: "usr_123",
 			name: "Jane Doe",
 			email: "jane@example.com",
-			emailVerified: true,
-			image: null,
-			createdAt: new Date(),
-			updatedAt: new Date(),
 		});
+
+		vi.spyOn(auth.api, "getSession").mockResolvedValue(mockSession);
+		vi.spyOn(accountService, "deleteAccount").mockResolvedValue(
+			mockSession.user,
+		);
 
 		const res = await app.request("/api/account/me", {
 			method: "DELETE",

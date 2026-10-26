@@ -21,7 +21,7 @@ export const article = pgTable(
 		excerpt: text("excerpt"),
 		body: text("body").notNull(),
 		status: articleStatus("status").notNull(),
-		publishedAt: timestamp("published_at"),
+		publishedAt: timestamp("published_at", { precision: 3 }),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()

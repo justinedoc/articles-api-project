@@ -1,4 +1,4 @@
-import { createRoute } from "@hono/zod-openapi";
+import { createRoute, z } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
 import { authMiddleware } from "@/core/auth/middleware";
@@ -20,6 +20,13 @@ const security = [{ BearerAuth: [] }];
 const articleResponse = (message: string) =>
 	jsonContent(
 		createMessageSchema(message, true).extend({ data: articleSelectSchema }),
+		message,
+	);
+const likeResponse = (message: string) =>
+	jsonContent(
+		createMessageSchema(message, true).extend({
+			data: z.object({ count: z.number(), liked: z.boolean() }),
+		}),
 		message,
 	);
 
@@ -142,6 +149,34 @@ export const archiveArticleRoute = transitionRoute(
 	"Archive an article",
 );
 
+export const likeArticleRoute = createRoute({
+	method: "post",
+	path: "/{id}/like",
+	summary: "Like a published article",
+	tags,
+	security,
+	middleware: [authMiddleware],
+	request: { params: articleIdParamSchema },
+	responses: {
+		[httpStatusCodes.OK]: likeResponse("Article liked successfully"),
+		...defaultErrorResponses,
+	},
+});
+
+export const unlikeArticleRoute = createRoute({
+	method: "delete",
+	path: "/{id}/like",
+	summary: "Unlike a published article",
+	tags,
+	security,
+	middleware: [authMiddleware],
+	request: { params: articleIdParamSchema },
+	responses: {
+		[httpStatusCodes.OK]: likeResponse("Article unliked successfully"),
+		...defaultErrorResponses,
+	},
+});
+
 export type CreateArticleRoute = typeof createArticleRoute;
 export type GetPublicArticleRoute = typeof getPublicArticleRoute;
 export type ListPublicArticlesRoute = typeof listPublicArticlesRoute;
@@ -150,3 +185,5 @@ export type UpdateArticleRoute = typeof updateArticleRoute;
 export type DeleteArticleRoute = typeof deleteArticleRoute;
 export type PublishArticleRoute = typeof publishArticleRoute;
 export type ArchiveArticleRoute = typeof archiveArticleRoute;
+export type LikeArticleRoute = typeof likeArticleRoute;
+export type UnlikeArticleRoute = typeof unlikeArticleRoute;

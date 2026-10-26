@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthSession } from "@/core/auth";
 import { auth } from "@/core/auth";
-import { createApp } from "@/core/server";
+import { createMockSession, createTestApp } from "@/core/test-utils";
 import { profilesRouter } from "../index";
 import * as profilesService from "../service";
 
 describe("Profiles Routes Integration Tests", () => {
-	const app = createApp().route("/profiles", profilesRouter);
+	const app = createTestApp("/profiles", profilesRouter);
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -26,27 +25,11 @@ describe("Profiles Routes Integration Tests", () => {
 	});
 
 	it("should return 422 Unprocessable Entity when PATCH /profiles/me has an invalid payload", async () => {
-		const mockSession: AuthSession = {
-			session: {
-				id: "sess_1",
-				userId: "usr_1",
-				expiresAt: new Date(Date.now() + 3600000),
-				token: "token_1",
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				ipAddress: null,
-				userAgent: null,
-			},
-			user: {
-				id: "usr_1",
-				email: "test@example.com",
-				name: "Test User",
-				emailVerified: true,
-				image: null,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			},
-		};
+		const mockSession = createMockSession({
+			id: "usr_1",
+			email: "test@example.com",
+			name: "Test User",
+		});
 
 		vi.spyOn(auth.api, "getSession").mockResolvedValue(mockSession);
 
@@ -79,27 +62,11 @@ describe("Profiles Routes Integration Tests", () => {
 			updatedAt: new Date(),
 		};
 
-		const mockSession: AuthSession = {
-			session: {
-				id: "sess_123",
-				userId: "usr_123",
-				expiresAt: new Date(Date.now() + 3600000),
-				token: "token_123",
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				ipAddress: null,
-				userAgent: null,
-			},
-			user: {
-				id: "usr_123",
-				name: "Jane Doe",
-				email: "jane@example.com",
-				emailVerified: true,
-				image: null,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			},
-		};
+		const mockSession = createMockSession({
+			id: "usr_123",
+			name: "Jane Doe",
+			email: "jane@example.com",
+		});
 
 		vi.spyOn(auth.api, "getSession").mockResolvedValue(mockSession);
 		vi.spyOn(profilesService, "getOrCreateProfile").mockResolvedValue(

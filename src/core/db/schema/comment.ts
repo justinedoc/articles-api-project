@@ -24,7 +24,7 @@ export const comment = pgTable(
 		}),
 		body: text("body").notNull(),
 		deletedAt: timestamp("deleted_at"),
-		createdAt: timestamp("created_at").defaultNow().notNull(),
+		createdAt: timestamp("created_at", { precision: 3 }).defaultNow().notNull(),
 		updatedAt: timestamp("updated_at")
 			.defaultNow()
 			.$onUpdate(() => /* @__PURE__ */ new Date())

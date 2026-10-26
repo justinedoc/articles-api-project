@@ -1,4 +1,5 @@
 export * from "./article";
+export * from "./article-like";
 export * from "./auth";
 export * from "./comment";
 export * from "./profile";

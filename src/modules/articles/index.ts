@@ -4,9 +4,11 @@ import {
 	create,
 	getMine,
 	getPublic,
+	like,
 	listPublic,
 	publish,
 	remove,
+	unlike,
 	update,
 } from "./handlers";
 import {
@@ -15,8 +17,10 @@ import {
 	deleteArticleRoute,
 	getOwnedArticleRoute,
 	getPublicArticleRoute,
+	likeArticleRoute,
 	listPublicArticlesRoute,
 	publishArticleRoute,
+	unlikeArticleRoute,
 	updateArticleRoute,
 } from "./routes";
 
@@ -28,7 +32,9 @@ export const articlesRouter = createRouter()
 	.openapi(updateArticleRoute, update)
 	.openapi(deleteArticleRoute, remove)
 	.openapi(publishArticleRoute, publish)
-	.openapi(archiveArticleRoute, archive);
+	.openapi(archiveArticleRoute, archive)
+	.openapi(likeArticleRoute, like)
+	.openapi(unlikeArticleRoute, unlike);
 
 export default articlesRouter;
 export * from "./schema";

@@ -11,7 +11,6 @@ export const commentCreateSchema = z.object({
 	parentId: z.string().min(1).nullable().optional(),
 });
 export const commentIdParamSchema = z.object({
-	articleId: z.string().min(1),
 	commentId: z.string().min(1),
 });
 export const articleCommentsParamSchema = z.object({
