@@ -39,10 +39,14 @@ export const defaultErrorResponses = {
 
 export { cursorPaginationQuerySchema };
 
-export const cursorPaginationResultSchema = <T extends z.ZodTypeAny>(
-	schema: T,
-) =>
+export const cursorPaginationResultSchema = <T extends z.ZodType>(schema: T) =>
 	z.object({
-		data: z.array(schema),
-		nextCursor: z.string().nullable(),
+		data: z.array(schema).openapi({
+			description: "List of items for the current page",
+		}),
+		nextCursor: z.string().nullable().openapi({
+			description:
+				"Cursor to fetch the next page, or null if no further pages exist",
+			example: "MjAyNi0xMC0yN1QwOTo0NTozMlowMDB8YXJ0XzEyMw",
+		}),
 	});

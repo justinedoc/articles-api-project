@@ -1,8 +1,14 @@
 import { z } from "@hono/zod-openapi";
 
 export const tagItemSchema = z.object({
-	id: z.string().openapi({ example: "tag_12345" }),
-	name: z.string().openapi({ example: "typescript" }),
+	id: z.string().openapi({
+		description: "Unique tag identifier",
+		example: "tag_12345",
+	}),
+	name: z.string().openapi({
+		description: "Normalized tag name (lowercase, unique)",
+		example: "typescript",
+	}),
 	articleCount: z.number().openapi({
 		description: "Total number of published articles with this tag",
 		example: 12,

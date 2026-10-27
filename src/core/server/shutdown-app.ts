@@ -2,7 +2,19 @@ import type { ServerType } from "@hono/node-server";
 import { pool } from "@/core/db";
 import { closeRedis } from "@/core/redis";
 
-export async function shutdownApp(signal: string, server: ServerType) {
+let isShuttingDown = false;
+
+export function resetShutdownStateForTesting() {
+	isShuttingDown = false;
+}
+
+export function shutdownApp(signal: string, server: ServerType): Promise<void> {
+	if (isShuttingDown) {
+		console.log(`\nSecond ${signal} received. Forcing immediate exit.`);
+		process.exit(1);
+	}
+	isShuttingDown = true;
+
 	console.log(`\nReceived ${signal}. Initiating graceful shutdown...`);
 
 	// Force close after 10s if connections refuse to drain
@@ -10,25 +22,39 @@ export async function shutdownApp(signal: string, server: ServerType) {
 		console.error("Shutdown timed out. Forcing exit.");
 		process.exit(1);
 	}, 10_000);
+	forceExitTimeout.unref();
 
-	server.close(async (err) => {
-		clearTimeout(forceExitTimeout);
-		if (err) console.error("Error closing HTTP server:", err);
+	// Close idle keep-alive connections if supported
+	const serverWithIdle = server as unknown as {
+		closeIdleConnections?: () => void;
+	};
+	if (typeof serverWithIdle.closeIdleConnections === "function") {
+		serverWithIdle.closeIdleConnections();
+	}
 
-		try {
-			await pool.end();
-			console.log("Database connection pool drained.");
-		} catch (poolErr) {
-			console.error("Error draining database pool:", poolErr);
-		}
+	return new Promise<void>((resolve) => {
+		server.close(async (err) => {
+			clearTimeout(forceExitTimeout);
+			if (err && (err as { code?: string }).code !== "ERR_SERVER_NOT_RUNNING") {
+				console.error("Error closing HTTP server:", err);
+			}
 
-		try {
-			await closeRedis();
-		} catch (redisErr) {
-			console.error("Error closing Redis connection:", redisErr);
-		}
+			try {
+				await pool.end();
+				console.log("Database connection pool drained.");
+			} catch (poolErr) {
+				console.error("Error draining database pool:", poolErr);
+			}
 
-		console.log("Graceful shutdown complete.");
-		process.exit(0);
+			try {
+				await closeRedis();
+			} catch (redisErr) {
+				console.error("Error closing Redis connection:", redisErr);
+			}
+
+			console.log("Graceful shutdown complete.");
+			resolve();
+			process.exit(0);
+		});
 	});
 }

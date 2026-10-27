@@ -1,10 +1,28 @@
+import { z } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
-import { z } from "zod";
 import { AppError } from "@/core/errors";
 
 export const cursorPaginationQuerySchema = z.object({
-	cursor: z.string().min(1).optional(),
-	limit: z.coerce.number().int().min(1).max(100).default(20),
+	cursor: z
+		.string()
+		.min(1)
+		.optional()
+		.openapi({
+			param: { name: "cursor", in: "query" },
+			description: "Opaque cursor for pagination (base64url encoded)",
+			example: "MjAyNi0xMC0yN1QwOTo0NTozMlowMDB8YXJ0XzEyMw",
+		}),
+	limit: z.coerce
+		.number()
+		.int()
+		.min(1)
+		.max(100)
+		.default(20)
+		.openapi({
+			param: { name: "limit", in: "query" },
+			description: "Maximum number of records to return per page (1 to 100)",
+			example: 20,
+		}),
 });
 
 export const encodeCursor = <T extends { createdAt: Date; id: string }>(

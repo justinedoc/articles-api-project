@@ -28,8 +28,15 @@ export const commentTreeNodeSchema: z.ZodType<CommentTreeNode> =
 		.openapi("CommentTreeNode");
 
 export const commentCreateSchema = z.object({
-	body: z.string().trim().min(1).max(5000),
-	parentId: z.string().min(1).nullable().optional(),
+	body: z.string().trim().min(1).max(5000).openapi({
+		description: "Comment body text (1-5000 characters)",
+		example: "This is a very insightful article, thanks for sharing!",
+	}),
+	parentId: z.string().min(1).nullable().optional().openapi({
+		description:
+			"ID of the parent comment if this is a reply, or null for root comments",
+		example: "comm_parent_123",
+	}),
 });
 
 export const commentIdParamSchema = z.object({
@@ -41,6 +48,7 @@ export const commentIdParamSchema = z.object({
 				name: "commentId",
 				in: "path",
 			},
+			description: "Unique comment identifier",
 			example: "comm_12345",
 		}),
 });
@@ -54,6 +62,7 @@ export const articleCommentsParamSchema = z.object({
 				name: "articleId",
 				in: "path",
 			},
+			description: "Unique article identifier",
 			example: "art_12345",
 		}),
 });

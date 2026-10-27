@@ -10,20 +10,73 @@ const { createSelectSchema } = createSchemaFactory({
 export const articleSelectSchema = createSelectSchema(article);
 
 export const articleCreateSchema = z.object({
-	title: z.string().trim().min(1).max(200),
-	excerpt: z.string().trim().max(500).nullable().optional(),
-	body: z.string().min(1),
-	tags: z.array(z.string().trim().min(1).max(50)).max(10).optional(),
+	title: z.string().trim().min(1).max(200).openapi({
+		description: "Article title",
+		example: "Mastering TypeScript and Distributed Systems",
+	}),
+	excerpt: z.string().trim().max(500).nullable().optional().openapi({
+		description: "Short summary or preview of the article",
+		example: "An in-depth guide to modern TypeScript architectures.",
+	}),
+	body: z.string().min(1).openapi({
+		description: "Full markdown or text body content",
+		example:
+			"# Introduction\n\nTypeScript provides robust static typing for web backends.",
+	}),
+	tags: z
+		.array(z.string().trim().min(1).max(50))
+		.max(10)
+		.optional()
+		.openapi({
+			description: "List of up to 10 topic tags",
+			example: ["typescript", "architecture", "nodejs"],
+		}),
 });
 
 export const articleUpdateSchema = articleCreateSchema.partial();
 
 export const articleIdParamSchema = z.object({
-	id: z.string().min(1),
+	id: z
+		.string()
+		.min(1)
+		.openapi({
+			param: {
+				name: "id",
+				in: "path",
+			},
+			description: "Unique article identifier",
+			example: "art_12345678",
+		}),
 });
 export const articleListQuerySchema = cursorPaginationQuerySchema.extend({
-	tag: z.string().trim().min(1).max(50).optional(),
-	search: z.string().trim().min(1).max(100).optional(),
+	tag: z
+		.string()
+		.trim()
+		.min(1)
+		.max(50)
+		.optional()
+		.openapi({
+			param: {
+				name: "tag",
+				in: "query",
+			},
+			description: "Filter articles by tag name",
+			example: "typescript",
+		}),
+	search: z
+		.string()
+		.trim()
+		.min(1)
+		.max(100)
+		.optional()
+		.openapi({
+			param: {
+				name: "search",
+				in: "query",
+			},
+			description: "Full-text search query matching article title and content",
+			example: "architecture",
+		}),
 });
 
 export const trendingArticleSchema = articleSelectSchema.extend({

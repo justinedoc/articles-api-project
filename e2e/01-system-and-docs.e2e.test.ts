@@ -21,8 +21,10 @@ describe("E2E: System, Docs & Middleware", () => {
 		expect(spec.paths["/profiles/me"]).toBeDefined();
 		expect(spec.paths["/profiles/{username}"]).toBeDefined();
 		expect(spec.paths["/articles"]).toBeDefined();
+		expect(spec.paths["/articles/trending"]).toBeDefined();
 		expect(spec.paths["/articles/{id}/like"]).toBeDefined();
 		expect(spec.paths["/articles/{articleId}/comments"]).toBeDefined();
+		expect(spec.paths["/tags/popular"]).toBeDefined();
 	});
 
 	it("should serve Scalar Reference HTML documentation at /api/v1/reference", async () => {
