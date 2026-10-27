@@ -9,9 +9,9 @@ import {
 } from "./routes";
 
 export const commentsRouter = createRouter()
+	.openapi(createCommentRoute, create)
 	.openapi(listCommentsRoute, list)
 	.openapi(listCommentRepliesRoute, listReplies)
-	.openapi(createCommentRoute, create)
 	.openapi(updateCommentRoute, update)
 	.openapi(deleteCommentRoute, remove);
 

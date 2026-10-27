@@ -32,29 +32,6 @@ export const getMyProfileRoute = createRoute({
 	},
 });
 
-export const updateMyProfileRoute = createRoute({
-	method: "patch",
-	path: "/me",
-	summary: "Update current user author profile",
-	description:
-		"Updates public author details (displayName, username, bio, avatarUrl, bannerUrl, websiteUrl, socialLinks). Synchronizes displayName and avatarUrl with user account credentials.",
-	tags,
-	security,
-	middleware: [authMiddleware],
-	request: {
-		body: jsonContentRequired(updateProfileSchema, "Profile update details"),
-	},
-	responses: {
-		[httpStatusCodes.OK]: jsonContent(
-			createMessageSchema("Profile updated successfully", true).extend({
-				data: selectProfileSchema,
-			}),
-			"Updated user profile",
-		),
-		...defaultErrorResponses,
-	},
-});
-
 export const getPublicProfileRoute = createRoute({
 	method: "get",
 	path: "/{username}",
@@ -87,6 +64,29 @@ export const getPublicProfileRoute = createRoute({
 	},
 });
 
+export const updateMyProfileRoute = createRoute({
+	method: "patch",
+	path: "/me",
+	summary: "Update current user author profile",
+	description:
+		"Updates public author details (displayName, username, bio, avatarUrl, bannerUrl, websiteUrl, socialLinks). Synchronizes displayName and avatarUrl with user account credentials.",
+	tags,
+	security,
+	middleware: [authMiddleware],
+	request: {
+		body: jsonContentRequired(updateProfileSchema, "Profile update details"),
+	},
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema("Profile updated successfully", true).extend({
+				data: selectProfileSchema,
+			}),
+			"Updated user profile",
+		),
+		...defaultErrorResponses,
+	},
+});
+
 export type GetMyProfileRoute = typeof getMyProfileRoute;
-export type UpdateMyProfileRoute = typeof updateMyProfileRoute;
 export type GetPublicProfileRoute = typeof getPublicProfileRoute;
+export type UpdateMyProfileRoute = typeof updateMyProfileRoute;

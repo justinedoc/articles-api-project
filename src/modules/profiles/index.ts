@@ -8,8 +8,8 @@ import {
 
 export const profilesRouter = createRouter()
 	.openapi(getMyProfileRoute, me)
-	.openapi(updateMyProfileRoute, update)
-	.openapi(getPublicProfileRoute, getPublic);
+	.openapi(getPublicProfileRoute, getPublic)
+	.openapi(updateMyProfileRoute, update);
 
 export default profilesRouter;
 export * from "./schema";

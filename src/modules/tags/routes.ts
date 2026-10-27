@@ -7,23 +7,6 @@ import { popularTagsQuerySchema, tagItemSchema } from "./schema";
 
 const tags = ["Tags"];
 
-export const listPopularTagsRoute = createRoute({
-	method: "get",
-	path: "/popular",
-	summary: "List popular tags with article counts",
-	tags,
-	request: { query: popularTagsQuerySchema },
-	responses: {
-		[httpStatusCodes.OK]: jsonContent(
-			createMessageSchema("Popular tags retrieved successfully", true).extend({
-				data: z.array(tagItemSchema),
-			}),
-			"Popular tags retrieved successfully",
-		),
-		...defaultErrorResponses,
-	},
-});
-
 export const listTagsRoute = createRoute({
 	method: "get",
 	path: "/",
@@ -41,5 +24,22 @@ export const listTagsRoute = createRoute({
 	},
 });
 
-export type ListPopularTagsRoute = typeof listPopularTagsRoute;
+export const listPopularTagsRoute = createRoute({
+	method: "get",
+	path: "/popular",
+	summary: "List popular tags with article counts",
+	tags,
+	request: { query: popularTagsQuerySchema },
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema("Popular tags retrieved successfully", true).extend({
+				data: z.array(tagItemSchema),
+			}),
+			"Popular tags retrieved successfully",
+		),
+		...defaultErrorResponses,
+	},
+});
+
 export type ListTagsRoute = typeof listTagsRoute;
+export type ListPopularTagsRoute = typeof listPopularTagsRoute;

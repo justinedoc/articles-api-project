@@ -26,6 +26,23 @@ const commentResponse = (message: string) =>
 		message,
 	);
 
+export const createCommentRoute = createRoute({
+	method: "post",
+	path: "/articles/{articleId}/comments",
+	summary: "Create a comment or reply",
+	tags,
+	security,
+	middleware: [authMiddleware],
+	request: {
+		params: articleCommentsParamSchema,
+		body: jsonContentRequired(commentCreateSchema, "Comment details"),
+	},
+	responses: {
+		[httpStatusCodes.CREATED]: commentResponse("Comment created successfully"),
+		...defaultErrorResponses,
+	},
+});
+
 export const listCommentsRoute = createRoute({
 	method: "get",
 	path: "/articles/{articleId}/comments",
@@ -70,23 +87,6 @@ export const listCommentRepliesRoute = createRoute({
 	},
 });
 
-export const createCommentRoute = createRoute({
-	method: "post",
-	path: "/articles/{articleId}/comments",
-	summary: "Create a comment or reply",
-	tags,
-	security,
-	middleware: [authMiddleware],
-	request: {
-		params: articleCommentsParamSchema,
-		body: jsonContentRequired(commentCreateSchema, "Comment details"),
-	},
-	responses: {
-		[httpStatusCodes.CREATED]: commentResponse("Comment created successfully"),
-		...defaultErrorResponses,
-	},
-});
-
 export const updateCommentRoute = createRoute({
 	method: "patch",
 	path: "/comments/{commentId}",
@@ -121,8 +121,8 @@ export const deleteCommentRoute = createRoute({
 	},
 });
 
+export type CreateCommentRoute = typeof createCommentRoute;
 export type ListCommentsRoute = typeof listCommentsRoute;
 export type ListCommentRepliesRoute = typeof listCommentRepliesRoute;
-export type CreateCommentRoute = typeof createCommentRoute;
 export type UpdateCommentRoute = typeof updateCommentRoute;
 export type DeleteCommentRoute = typeof deleteCommentRoute;

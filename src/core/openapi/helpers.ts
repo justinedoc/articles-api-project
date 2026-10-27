@@ -47,6 +47,6 @@ export const cursorPaginationResultSchema = <T extends z.ZodType>(schema: T) =>
 		nextCursor: z.string().nullable().openapi({
 			description:
 				"Cursor to fetch the next page, or null if no further pages exist",
-			example: "MjAyNi0xMC0yN1QwOTo0NTozMlowMDB8YXJ0XzEyMw",
+			example: "MjAyNi0xMC0yN1QwOTo0NTozMi4wMDBafGFydF8xMjM",
 		}),
 	});

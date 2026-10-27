@@ -30,15 +30,15 @@ import {
 
 export const articlesRouter = createRouter()
 	.openapi(createArticleRoute, create)
+	.openapi(listPublicArticlesRoute, listPublic)
 	.openapi(getTrendingArticlesRoute, trending)
 	.openapi(listOwnedArticlesRoute, listMine)
-	.openapi(listPublicArticlesRoute, listPublic)
 	.openapi(getPublicArticleRoute, getPublic)
 	.openapi(getOwnedArticleRoute, getMine)
 	.openapi(updateArticleRoute, update)
-	.openapi(deleteArticleRoute, remove)
 	.openapi(publishArticleRoute, publish)
 	.openapi(archiveArticleRoute, archive)
+	.openapi(deleteArticleRoute, remove)
 	.openapi(likeArticleRoute, like)
 	.openapi(unlikeArticleRoute, unlike);
 

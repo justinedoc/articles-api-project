@@ -3,8 +3,8 @@ import { list, popular } from "./handlers";
 import { listPopularTagsRoute, listTagsRoute } from "./routes";
 
 export const tagsRouter = createRouter()
-	.openapi(listPopularTagsRoute, popular)
-	.openapi(listTagsRoute, list);
+	.openapi(listTagsRoute, list)
+	.openapi(listPopularTagsRoute, popular);
 
 export default tagsRouter;
 export * from "./schema";

@@ -9,8 +9,8 @@ export const cursorPaginationQuerySchema = z.object({
 		.optional()
 		.openapi({
 			param: { name: "cursor", in: "query" },
-			description: "Opaque cursor for pagination (base64url encoded)",
-			example: "MjAyNi0xMC0yN1QwOTo0NTozMlowMDB8YXJ0XzEyMw",
+			description:
+				"Opaque pagination cursor from nextCursor of the previous page. Leave empty/omitted for the first page.",
 		}),
 	limit: z.coerce
 		.number()

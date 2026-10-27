@@ -75,7 +75,6 @@ export const articleListQuerySchema = cursorPaginationQuerySchema.extend({
 				in: "query",
 			},
 			description: "Full-text search query matching article title and content",
-			example: "architecture",
 		}),
 });
 
@@ -141,7 +140,6 @@ export const ownArticlesQuerySchema = cursorPaginationQuerySchema.extend({
 				in: "query",
 			},
 			description: "Search own articles matching title and content",
-			example: "architecture",
 		}),
 });
 

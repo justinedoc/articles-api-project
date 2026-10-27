@@ -49,6 +49,23 @@ export const createArticleRoute = createRoute({
 	},
 });
 
+export const listPublicArticlesRoute = createRoute({
+	method: "get",
+	path: "/",
+	summary: "List published articles",
+	tags,
+	request: { query: articleListQuerySchema },
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema("Articles retrieved successfully", true).extend({
+				data: cursorPaginationResultSchema(articleSelectSchema),
+			}),
+			"Articles retrieved successfully",
+		),
+		...defaultErrorResponses,
+	},
+});
+
 export const getTrendingArticlesRoute = createRoute({
 	method: "get",
 	path: "/trending",
@@ -69,39 +86,10 @@ export const getTrendingArticlesRoute = createRoute({
 	},
 });
 
-export const getPublicArticleRoute = createRoute({
-	method: "get",
-	path: "/{id}",
-	summary: "Get a published article",
-	tags,
-	request: { params: articleIdParamSchema },
-	responses: {
-		[httpStatusCodes.OK]: articleResponse("Article retrieved successfully"),
-		...defaultErrorResponses,
-	},
-});
-
-export const listPublicArticlesRoute = createRoute({
-	method: "get",
-	path: "/",
-	summary: "List published articles",
-	tags,
-	request: { query: articleListQuerySchema },
-	responses: {
-		[httpStatusCodes.OK]: jsonContent(
-			createMessageSchema("Articles retrieved successfully", true).extend({
-				data: cursorPaginationResultSchema(articleSelectSchema),
-			}),
-			"Articles retrieved successfully",
-		),
-		...defaultErrorResponses,
-	},
-});
-
 export const listOwnedArticlesRoute = createRoute({
 	method: "get",
 	path: "/mine",
-	summary: "List authenticated author's owned articles",
+	summary: "List owned articles",
 	tags,
 	security,
 	middleware: [authMiddleware],
@@ -115,6 +103,18 @@ export const listOwnedArticlesRoute = createRoute({
 			),
 			"Owned articles retrieved successfully",
 		),
+		...defaultErrorResponses,
+	},
+});
+
+export const getPublicArticleRoute = createRoute({
+	method: "get",
+	path: "/{id}",
+	summary: "Get a published article",
+	tags,
+	request: { params: articleIdParamSchema },
+	responses: {
+		[httpStatusCodes.OK]: articleResponse("Article retrieved successfully"),
 		...defaultErrorResponses,
 	},
 });
@@ -150,23 +150,6 @@ export const updateArticleRoute = createRoute({
 	},
 });
 
-export const deleteArticleRoute = createRoute({
-	method: "delete",
-	path: "/{id}",
-	summary: "Delete an owned article",
-	tags,
-	security,
-	middleware: [authMiddleware],
-	request: { params: articleIdParamSchema },
-	responses: {
-		[httpStatusCodes.OK]: jsonContent(
-			createMessageSchema("Article deleted successfully", true),
-			"Article deleted successfully",
-		),
-		...defaultErrorResponses,
-	},
-});
-
 const transitionRoute = (path: string, summary: string) =>
 	createRoute({
 		method: "post",
@@ -188,10 +171,28 @@ export const publishArticleRoute = transitionRoute(
 	"/{id}/publish",
 	"Publish or restore an article",
 );
+
 export const archiveArticleRoute = transitionRoute(
 	"/{id}/archive",
 	"Archive an article",
 );
+
+export const deleteArticleRoute = createRoute({
+	method: "delete",
+	path: "/{id}",
+	summary: "Delete an owned article",
+	tags,
+	security,
+	middleware: [authMiddleware],
+	request: { params: articleIdParamSchema },
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema("Article deleted successfully", true),
+			"Article deleted successfully",
+		),
+		...defaultErrorResponses,
+	},
+});
 
 export const likeArticleRoute = createRoute({
 	method: "post",
@@ -222,14 +223,14 @@ export const unlikeArticleRoute = createRoute({
 });
 
 export type CreateArticleRoute = typeof createArticleRoute;
-export type GetTrendingArticlesRoute = typeof getTrendingArticlesRoute;
-export type GetPublicArticleRoute = typeof getPublicArticleRoute;
 export type ListPublicArticlesRoute = typeof listPublicArticlesRoute;
+export type GetTrendingArticlesRoute = typeof getTrendingArticlesRoute;
 export type ListOwnedArticlesRoute = typeof listOwnedArticlesRoute;
+export type GetPublicArticleRoute = typeof getPublicArticleRoute;
 export type GetOwnedArticleRoute = typeof getOwnedArticleRoute;
 export type UpdateArticleRoute = typeof updateArticleRoute;
-export type DeleteArticleRoute = typeof deleteArticleRoute;
 export type PublishArticleRoute = typeof publishArticleRoute;
 export type ArchiveArticleRoute = typeof archiveArticleRoute;
+export type DeleteArticleRoute = typeof deleteArticleRoute;
 export type LikeArticleRoute = typeof likeArticleRoute;
 export type UnlikeArticleRoute = typeof unlikeArticleRoute;
