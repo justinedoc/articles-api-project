@@ -41,7 +41,8 @@ export const cleanupTestUsers = async (userIds: Iterable<string>) => {
  */
 export const truncateTables = async (...tables: string[]) => {
 	for (const table of tables) {
-		await db.execute(sql.raw(`TRUNCATE TABLE "${table}" CASCADE`));
+		const safeTable = table.replace(/"/g, '""');
+		await db.execute(sql.raw(`TRUNCATE TABLE "${safeTable}" CASCADE`));
 	}
 };
 

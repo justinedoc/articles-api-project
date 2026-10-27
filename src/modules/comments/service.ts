@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, or, type SQL, sql } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
@@ -70,7 +70,7 @@ export const listComments = async (
 	limit: number,
 ) => {
 	await assertPublishedArticle(articleId);
-	const conditions = [
+	const conditions: (SQL | undefined)[] = [
 		eq(comment.articleId, articleId),
 		isNull(comment.parentId),
 	];
@@ -83,7 +83,7 @@ export const listComments = async (
 					eq(comment.createdAt, decoded.createdAt),
 					gt(comment.id, decoded.id),
 				),
-			) as never,
+			),
 		);
 	}
 
@@ -173,7 +173,7 @@ export const listCommentReplies = async (
 		};
 	}
 
-	const conditions = [eq(comment.parentId, commentId)];
+	const conditions: (SQL | undefined)[] = [eq(comment.parentId, commentId)];
 	if (cursor) {
 		const decoded = decodeCursor(cursor);
 		conditions.push(
@@ -183,7 +183,7 @@ export const listCommentReplies = async (
 					eq(comment.createdAt, decoded.createdAt),
 					gt(comment.id, decoded.id),
 				),
-			) as never,
+			),
 		);
 	}
 

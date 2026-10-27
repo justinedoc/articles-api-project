@@ -8,6 +8,7 @@ import {
 	isNull,
 	lt,
 	or,
+	type SQL,
 	sql,
 } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
@@ -452,14 +453,14 @@ export const listPublicArticles = async (
 	authorName?: string,
 	viewerId?: string,
 ) => {
-	const conditions = [eq(article.status, "published")];
+	const conditions: (SQL | undefined)[] = [eq(article.status, "published")];
 	const normalizedTag = tagName?.trim().toLowerCase();
 	const normalizedSearch = searchTerm?.trim();
 	const normalizedAuthor = authorName?.trim().toLowerCase();
 
 	if (normalizedSearch) {
 		conditions.push(
-			sql`to_tsvector('english', ${article.title} || ' ' || ${article.body}) @@ plainto_tsquery('english', ${normalizedSearch})` as never,
+			sql`to_tsvector('english', ${article.title} || ' ' || ${article.body}) @@ plainto_tsquery('english', ${normalizedSearch})`,
 		);
 	}
 	if (normalizedAuthor) {
@@ -469,7 +470,7 @@ export const listPublicArticles = async (
 				LEFT JOIN ${profile} p ON p.user_id = u.id
 				WHERE u.id = ${article.authorId}
 				  AND (LOWER(p.username) = ${normalizedAuthor} OR LOWER(u.name) = ${normalizedAuthor})
-			)` as never,
+			)`,
 		);
 	}
 	if (cursor) {
@@ -481,7 +482,7 @@ export const listPublicArticles = async (
 					eq(article.publishedAt, decoded.createdAt),
 					lt(article.id, decoded.id),
 				),
-			) as never,
+			),
 		);
 	}
 
@@ -531,7 +532,7 @@ export const listOwnedArticles = async (
 	tagName?: string,
 	searchTerm?: string,
 ) => {
-	const conditions = [eq(article.authorId, userId)];
+	const conditions: (SQL | undefined)[] = [eq(article.authorId, userId)];
 	if (status) {
 		conditions.push(eq(article.status, status));
 	}
@@ -539,7 +540,7 @@ export const listOwnedArticles = async (
 	const normalizedSearch = searchTerm?.trim();
 	if (normalizedSearch) {
 		conditions.push(
-			sql`to_tsvector('english', ${article.title} || ' ' || ${article.body}) @@ plainto_tsquery('english', ${normalizedSearch})` as never,
+			sql`to_tsvector('english', ${article.title} || ' ' || ${article.body}) @@ plainto_tsquery('english', ${normalizedSearch})`,
 		);
 	}
 	if (cursor) {
@@ -551,7 +552,7 @@ export const listOwnedArticles = async (
 					eq(article.createdAt, decoded.createdAt),
 					lt(article.id, decoded.id),
 				),
-			) as never,
+			),
 		);
 	}
 

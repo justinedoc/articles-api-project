@@ -7,7 +7,16 @@ const { createSelectSchema } = createSchemaFactory({
 	zodInstance: z,
 });
 
-export const articleSelectSchema = createSelectSchema(article);
+export const articleStatusSchema = z
+	.enum(["draft", "published", "archived"])
+	.openapi({
+		description: "Article publication status",
+		example: "published",
+	});
+
+export const articleSelectSchema = createSelectSchema(article, {
+	status: articleStatusSchema,
+});
 
 export const articleCreateSchema = z.object({
 	title: z.string().trim().min(1).max(200).openapi({
