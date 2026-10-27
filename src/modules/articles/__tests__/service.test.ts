@@ -79,6 +79,21 @@ describe("Article Service (PostgreSQL integration)", () => {
 		await expect(
 			transitionArticle(created.id, userId, "published"),
 		).rejects.toThrow(/Cannot transition article/);
+
+		const updatedWithOnlyTags = await updateArticle(created.id, userId, {
+			tags: ["Database", "Architecture"],
+		});
+		expect(updatedWithOnlyTags.id).toBe(created.id);
+
+		const updatedLinks = await db
+			.select({ name: tag.name })
+			.from(articleTag)
+			.innerJoin(tag, eq(tag.id, articleTag.tagId))
+			.where(eq(articleTag.articleId, created.id));
+		expect(updatedLinks.map(({ name }) => name).sort()).toEqual([
+			"architecture",
+			"database",
+		]);
 	});
 
 	it("lists published articles with cursor, tag, and full-text filters", async () => {

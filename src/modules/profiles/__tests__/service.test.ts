@@ -284,5 +284,43 @@ describe("Profiles Service", () => {
 			expect(cache.del).toHaveBeenCalledWith("profiles:username:alice");
 			expect(cache.del).toHaveBeenCalledWith("account:user:usr_1");
 		});
+
+		it("should catch database 23505 unique constraint violation and throw 409 conflict", async () => {
+			const existingProfile = {
+				id: "prof_1",
+				userId: "usr_1",
+				username: "alice",
+				displayName: "Alice",
+			};
+
+			vi.mocked(cache.getOrSet).mockResolvedValue(existingProfile);
+
+			// Pre-check passes
+			const selectMock = {
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([]),
+			};
+			vi.mocked(db.select).mockReturnValue(
+				selectMock as unknown as ReturnType<typeof db.select>,
+			);
+
+			// Update throws 23505 on concurrent race
+			const dbError = new Error("duplicate key value") as Error & {
+				code: string;
+			};
+			dbError.code = "23505";
+			vi.mocked(db.update).mockImplementation(() => {
+				throw dbError;
+			});
+
+			await expect(
+				updateProfile("usr_1", { username: "taken_by_race" }),
+			).rejects.toThrow(
+				new AppError(
+					"Username is already taken by another author",
+					httpStatusCodes.CONFLICT,
+				),
+			);
+		});
 	});
 });

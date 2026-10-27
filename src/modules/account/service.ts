@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
-import { profile, user } from "@/core/db/schema";
+import { article, profile, user } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
+import { getArticleCacheKey } from "@/modules/articles/service";
 import {
 	getProfileUserCacheKey,
 	getProfileUsernameCacheKey,
@@ -34,30 +35,37 @@ export const getAccount = async (userId: string) => {
 };
 
 export const deleteAccount = async (userId: string) => {
-	const { userProfile, deleted } = await db.transaction(async (tx) => {
-		const [userProfile] = await tx
-			.select({ username: profile.username })
-			.from(profile)
-			.where(eq(profile.userId, userId));
-		const [deleted] = await tx
-			.delete(user)
-			.where(eq(user.id, userId))
-			.returning();
+	const { userProfile, userArticles, deleted } = await db.transaction(
+		async (tx) => {
+			const [userProfile] = await tx
+				.select({ username: profile.username })
+				.from(profile)
+				.where(eq(profile.userId, userId));
+			const userArticles = await tx
+				.select({ id: article.id })
+				.from(article)
+				.where(eq(article.authorId, userId));
+			const [deleted] = await tx
+				.delete(user)
+				.where(eq(user.id, userId))
+				.returning();
 
-		return { userProfile, deleted };
-	});
+			return { userProfile, userArticles, deleted };
+		},
+	);
 
 	if (!deleted) {
 		throw new AppError("Account not found", httpStatusCodes.NOT_FOUND);
 	}
 
-	// Invalidate account and profile caches
+	// Invalidate account, profile, and article caches
 	await Promise.all([
 		cache.del(getAccountCacheKey(userId)),
 		cache.del(getProfileUserCacheKey(userId)),
 		userProfile?.username
 			? cache.del(getProfileUsernameCacheKey(userProfile.username))
 			: Promise.resolve(),
+		...userArticles.map((a) => cache.del(getArticleCacheKey(a.id))),
 	]);
 
 	return deleted;

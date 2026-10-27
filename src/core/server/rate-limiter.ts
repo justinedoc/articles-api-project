@@ -46,7 +46,7 @@ export function getClientIp(
 		if (xRealIp) return xRealIp;
 	}
 
-	return c.env?.incoming?.socket.remoteAddress ?? "unknown";
+	return c.env?.incoming?.socket?.remoteAddress ?? "unknown";
 }
 
 /**
@@ -71,11 +71,18 @@ export function rateLimiter(
 
 		let redisKey = "";
 		try {
-			const user =
-				c.get("user") ??
-				(c.req.header("authorization") || c.req.header("cookie")
-					? (await auth.api.getSession({ headers: c.req.raw.headers }))?.user
-					: null);
+			let user = c.get("user");
+			if (!user && (c.req.header("authorization") || c.req.header("cookie"))) {
+				const session = await auth.api.getSession({
+					headers: c.req.raw.headers,
+				});
+				if (session) {
+					user = session.user;
+					c.set("user", session.user);
+					c.set("session", session.session);
+				}
+			}
+
 			const identifier = options.keyGenerator
 				? options.keyGenerator(c)
 				: user?.id
@@ -106,11 +113,15 @@ export function rateLimiter(
 			const remaining = Math.max(0, maxRequests - currentRequests);
 			const resetSeconds = windowSeconds;
 
+			c.header("RateLimit-Limit", String(maxRequests));
+			c.header("RateLimit-Remaining", String(remaining));
+			c.header("RateLimit-Reset", String(resetSeconds));
 			c.res.headers.set("RateLimit-Limit", String(maxRequests));
 			c.res.headers.set("RateLimit-Remaining", String(remaining));
 			c.res.headers.set("RateLimit-Reset", String(resetSeconds));
 
 			if (currentRequests > maxRequests) {
+				c.header("Retry-After", String(resetSeconds));
 				c.res.headers.set("Retry-After", String(resetSeconds));
 				baseLogger.warn(
 					{ identifier, currentRequests, maxRequests },

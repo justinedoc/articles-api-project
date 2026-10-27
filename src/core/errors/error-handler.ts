@@ -6,11 +6,12 @@ import { AppError } from "@/core/errors/app-error";
 import type { AppBindings } from "@/core/types";
 
 export const onError: ErrorHandler<AppBindings> = (err, c) => {
-	const currentStatus =
-		"status" in err ? err.status : c.newResponse(null).status;
 	const statusCode =
-		currentStatus !== "OK"
-			? (currentStatus as ContentfulStatusCode)
+		"status" in err &&
+		typeof err.status === "number" &&
+		err.status >= 400 &&
+		err.status < 600
+			? (err.status as ContentfulStatusCode)
 			: INTERNAL_SERVER_ERROR;
 
 	const { NODE_ENV } = env(c);

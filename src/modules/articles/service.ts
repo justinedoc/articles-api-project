@@ -38,27 +38,19 @@ const syncArticleTags = async (
 	await tx.delete(articleTag).where(eq(articleTag.articleId, articleId));
 	if (names.length === 0) return;
 
-	const existing = await tx
-		.select()
-		.from(tag)
-		.where(or(...names.map((name) => eq(tag.name, name))));
-	const existingByName = new Map(
-		existing.map((record) => [record.name, record]),
-	);
-	const missing = names.filter((name) => !existingByName.has(name));
-	if (missing.length > 0) {
-		const created = await tx
-			.insert(tag)
-			.values(missing.map((name) => ({ name })))
-			.onConflictDoNothing()
-			.returning();
-		for (const record of created) existingByName.set(record.name, record);
-	}
+	const tagRecords = await tx
+		.insert(tag)
+		.values(names.map((name) => ({ name })))
+		.onConflictDoUpdate({
+			target: tag.name,
+			set: { name: sql`excluded.name` },
+		})
+		.returning();
 
 	await tx.insert(articleTag).values(
-		names.map((name) => ({
+		tagRecords.map((t) => ({
 			articleId,
-			tagId: existingByName.get(name)?.id ?? "",
+			tagId: t.id,
 		})),
 	);
 };
@@ -91,17 +83,14 @@ const assertPublished = async (articleId: string) => {
 };
 
 const getLikeResult = async (articleId: string, userId: string) => {
-	const [likes] = await db
-		.select({ count: count() })
+	const [result] = await db
+		.select({
+			count: count(),
+			liked: sql<boolean>`COALESCE(bool_or(${articleLike.userId} = ${userId}), false)`,
+		})
 		.from(articleLike)
 		.where(eq(articleLike.articleId, articleId));
-	const [userLike] = await db
-		.select({ articleId: articleLike.articleId })
-		.from(articleLike)
-		.where(
-			and(eq(articleLike.articleId, articleId), eq(articleLike.userId, userId)),
-		);
-	return { count: Number(likes?.count ?? 0), liked: Boolean(userLike) };
+	return { count: Number(result?.count ?? 0), liked: Boolean(result?.liked) };
 };
 
 export const createArticle = async (
@@ -234,8 +223,11 @@ export const listPublicArticles = async (
 	return {
 		data,
 		nextCursor:
-			hasNextPage && last?.publishedAt
-				? encodeCursor({ createdAt: last.publishedAt, id: last.id })
+			hasNextPage && last
+				? encodeCursor({
+						createdAt: last.publishedAt ?? last.createdAt,
+						id: last.id,
+					})
 				: null,
 	};
 };
@@ -264,26 +256,38 @@ export const updateArticle = async (
 	const current = await getArticleOrThrow(id);
 	assertOwner(current, userId);
 	const { tags: requestedTags, ...articlePayload } = payload;
+	const hasFieldUpdates = Object.keys(articlePayload).length > 0;
+	const updateValues = {
+		...articlePayload,
+		updatedAt: new Date(),
+	};
 
-	const updated = requestedTags
-		? await db.transaction(async (transaction) => {
-				const [record] = await transaction
-					.update(article)
-					.set(articlePayload)
-					.where(eq(article.id, id))
-					.returning();
-				if (record) {
-					await syncArticleTags(transaction, id, normalizeTags(requestedTags));
-				}
-				return record;
-			})
-		: (
-				await db
-					.update(article)
-					.set(articlePayload)
-					.where(eq(article.id, id))
-					.returning()
-			)[0];
+	const updated =
+		requestedTags !== undefined
+			? await db.transaction(async (transaction) => {
+					const [record] = await transaction
+						.update(article)
+						.set(updateValues)
+						.where(eq(article.id, id))
+						.returning();
+					if (record) {
+						await syncArticleTags(
+							transaction,
+							id,
+							normalizeTags(requestedTags),
+						);
+					}
+					return record;
+				})
+			: hasFieldUpdates
+				? (
+						await db
+							.update(article)
+							.set(updateValues)
+							.where(eq(article.id, id))
+							.returning()
+					)[0]
+				: current;
 
 	if (!updated) {
 		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
@@ -318,7 +322,10 @@ export const transitionArticle = async (
 		.set({
 			status: transition,
 			publishedAt:
-				transition === "published" ? (current.publishedAt ?? new Date()) : null,
+				transition === "published"
+					? (current.publishedAt ?? new Date())
+					: current.publishedAt,
+			updatedAt: new Date(),
 		})
 		.where(eq(article.id, id))
 		.returning();

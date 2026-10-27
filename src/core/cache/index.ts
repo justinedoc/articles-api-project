@@ -32,7 +32,7 @@ const NULL_SENTINEL = "__NULL_CACHE_SENTINEL__";
  * only one DB query executes while all others await the same in-flight Promise.
  */
 const inFlightRequests = new Map<string, Promise<unknown>>();
-const keyVersions = new Map<string, number>();
+const inFlightTokens = new Map<string, symbol>();
 
 type CacheEntry<T> = {
 	hit: boolean;
@@ -105,8 +105,7 @@ class CacheService {
 	 * Invalidate a specific cache key.
 	 */
 	async del(key: string): Promise<void> {
-		const nextVersion = (keyVersions.get(key) ?? 0) + 1;
-		keyVersions.set(key, nextVersion);
+		inFlightTokens.delete(key);
 
 		if (!isRedisAvailable()) return;
 
@@ -169,38 +168,43 @@ class CacheService {
 		fetchFn: () => Promise<T | null>,
 		options: CacheOptions = {},
 	): Promise<T | null> {
-		const version = keyVersions.get(key) ?? 0;
-		const versionedKey = `${key}:v${version}`;
-
 		// 1. Try cache
-		const cached = await this.getEntry<T>(versionedKey);
+		const cached = await this.getEntry<T>(key);
 		if (cached.hit) {
 			return cached.value;
 		}
 
 		// 2. Prevent Thundering Herd using in-flight deduplication
-		if (inFlightRequests.has(versionedKey)) {
-			return inFlightRequests.get(versionedKey) as Promise<T | null>;
+		if (inFlightRequests.has(key)) {
+			return inFlightRequests.get(key) as Promise<T | null>;
 		}
+
+		const currentToken = Symbol();
+		inFlightTokens.set(key, currentToken);
 
 		const fetchPromise = (async () => {
 			try {
 				const freshData = await fetchFn();
 
-				// 3. Cache result (or negative cache if null)
-				if (freshData !== null) {
-					await this.set(versionedKey, freshData, options);
-				} else if (options.cacheNull !== false) {
-					await this.set(versionedKey, null, options);
+				// 3. Cache result if not invalidated in-flight (or negative cache if null)
+				if (inFlightTokens.get(key) === currentToken) {
+					if (freshData !== null) {
+						await this.set(key, freshData, options);
+					} else if (options.cacheNull !== false) {
+						await this.set(key, null, options);
+					}
 				}
 
 				return freshData;
 			} finally {
-				inFlightRequests.delete(versionedKey);
+				inFlightRequests.delete(key);
+				if (inFlightTokens.get(key) === currentToken) {
+					inFlightTokens.delete(key);
+				}
 			}
 		})();
 
-		inFlightRequests.set(versionedKey, fetchPromise);
+		inFlightRequests.set(key, fetchPromise);
 		return fetchPromise;
 	}
 }

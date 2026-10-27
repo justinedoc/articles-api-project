@@ -4,24 +4,30 @@ import { auth } from "@/core/auth";
 import type { AppBindings } from "@/core/types";
 
 export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
-	const session = await auth.api.getSession({ headers: c.req.raw.headers });
+	let user = c.get("user");
+	let session = c.get("session");
 
-	if (!session) {
-		return c.json(
-			{
-				success: false,
-				message: "Unauthorized",
-			},
-			httpStatusCodes.UNAUTHORIZED,
-		);
+	if (!session || !user) {
+		const authResult = await auth.api.getSession({
+			headers: c.req.raw.headers,
+		});
+
+		if (!authResult) {
+			return c.json(
+				{
+					success: false,
+					message: "Unauthorized",
+				},
+				httpStatusCodes.UNAUTHORIZED,
+			);
+		}
+
+		user = authResult.user;
+		session = authResult.session;
+		c.set("user", user);
+		c.set("session", session);
 	}
 
-	c.set("user", session.user);
-	c.set("session", session.session);
-
-	c.var.logger.info(
-		{ userId: session.user.id },
-		"User accessed protected route",
-	);
+	c.var?.logger?.info({ userId: user.id }, "User accessed protected route");
 	await next();
 });

@@ -24,12 +24,16 @@ export const getProfileUsernameCacheKey = (username: string) =>
 export async function generateUniqueUsername(
 	baseString: string,
 ): Promise<string> {
-	return (
-		baseString
-			.split("@")[0]
-			.toLowerCase()
-			.replace(/[^a-z0-9_-]/g, "") || "user"
-	);
+	const cleaned = baseString
+		.split("@")[0]
+		.toLowerCase()
+		.replace(/[^a-z0-9_-]/g, "");
+
+	if (cleaned.length < 3) {
+		return `user_${cleaned || crypto.randomBytes(2).toString("hex")}`;
+	}
+
+	return cleaned.slice(0, 20);
 }
 
 /**
@@ -185,56 +189,74 @@ export const updateProfile = async (
 		...(payload.username ? { username: payload.username.toLowerCase() } : {}),
 	};
 
-	const updated = await db.transaction(async (tx) => {
-		if (
-			payload.username &&
-			payload.username.toLowerCase() !== currentProfile.username.toLowerCase()
-		) {
-			const [collision] = await tx
-				.select({ id: profile.id })
-				.from(profile)
-				.where(
-					and(
-						eq(profile.username, payload.username.toLowerCase()),
-						ne(profile.userId, userId),
-					),
-				);
+	try {
+		const updated = await db.transaction(async (tx) => {
+			if (
+				payload.username &&
+				payload.username.toLowerCase() !== currentProfile.username.toLowerCase()
+			) {
+				const [collision] = await tx
+					.select({ id: profile.id })
+					.from(profile)
+					.where(
+						and(
+							eq(profile.username, payload.username.toLowerCase()),
+							ne(profile.userId, userId),
+						),
+					);
 
-			if (collision) {
-				throw new AppError(
-					"Username is already taken by another author",
-					httpStatusCodes.CONFLICT,
-				);
+				if (collision) {
+					throw new AppError(
+						"Username is already taken by another author",
+						httpStatusCodes.CONFLICT,
+					);
+				}
 			}
+
+			if (Object.keys(userUpdates).length > 0) {
+				await tx.update(user).set(userUpdates).where(eq(user.id, userId));
+			}
+
+			const [updatedProfile] = await tx
+				.update(profile)
+				.set(profileUpdates)
+				.where(eq(profile.userId, userId))
+				.returning();
+
+			return updatedProfile;
+		});
+
+		if (!updated) {
+			throw new AppError("Profile not found", httpStatusCodes.NOT_FOUND);
 		}
 
-		if (Object.keys(userUpdates).length > 0) {
-			await tx.update(user).set(userUpdates).where(eq(user.id, userId));
+		await Promise.all([
+			Object.keys(userUpdates).length > 0
+				? cache.del(getAccountCacheKey(userId))
+				: Promise.resolve(),
+			cache.del(getProfileUserCacheKey(userId)),
+			cache.del(getProfileUsernameCacheKey(currentProfile.username)),
+			updated.username !== currentProfile.username
+				? cache.del(getProfileUsernameCacheKey(updated.username))
+				: Promise.resolve(),
+		]);
+
+		return updated;
+	} catch (err: unknown) {
+		if (err instanceof AppError) {
+			throw err;
 		}
-
-		const [updatedProfile] = await tx
-			.update(profile)
-			.set(profileUpdates)
-			.where(eq(profile.userId, userId))
-			.returning();
-
-		return updatedProfile;
-	});
-
-	if (!updated) {
-		throw new AppError("Profile not found", httpStatusCodes.NOT_FOUND);
+		if (
+			typeof err === "object" &&
+			err !== null &&
+			"code" in err &&
+			err.code === "23505"
+		) {
+			throw new AppError(
+				"Username is already taken by another author",
+				httpStatusCodes.CONFLICT,
+			);
+		}
+		throw err;
 	}
-
-	await Promise.all([
-		Object.keys(userUpdates).length > 0
-			? cache.del(getAccountCacheKey(userId))
-			: Promise.resolve(),
-		cache.del(getProfileUserCacheKey(userId)),
-		cache.del(getProfileUsernameCacheKey(currentProfile.username)),
-		updated.username !== currentProfile.username
-			? cache.del(getProfileUsernameCacheKey(updated.username))
-			: Promise.resolve(),
-	]);
-
-	return updated;
 };

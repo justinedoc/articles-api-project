@@ -132,6 +132,9 @@ describe("Account Service", () => {
 					.from(articleLike)
 					.where(eq(articleLike.articleId, createdArticle.id)),
 			).toEqual([]);
+			expect(cache.del).toHaveBeenCalledWith(
+				`articles:id:${createdArticle.id}`,
+			);
 		});
 	});
 });

@@ -72,6 +72,27 @@ describe("CacheService Unit Tests", () => {
 	});
 
 	it("should delete key on cache.del", async () => {
-		await expect(cache.del("test:item:1")).resolves.toBeUndefined();
+		vi.spyOn(redisModule, "isRedisAvailable").mockReturnValue(true);
+		const delSpy = vi
+			.spyOn(redisModule.redis, "del")
+			.mockResolvedValue(1 as never);
+
+		await cache.del("test:item:1");
+		expect(delSpy).toHaveBeenCalledWith("test:item:1");
+	});
+
+	it("should not write stale data to cache if cache.del was invoked during an in-flight fetch", async () => {
+		vi.spyOn(redisModule, "isRedisAvailable").mockReturnValue(true);
+		vi.spyOn(redisModule.redis, "get").mockResolvedValue(null);
+		const setSpy = vi.spyOn(redisModule.redis, "set").mockResolvedValue("OK");
+
+		const slowFetch = vi.fn(async () => {
+			await cache.del("test:racing:key");
+			return { id: "stale" };
+		});
+
+		const result = await cache.getOrSet("test:racing:key", slowFetch);
+		expect(result).toEqual({ id: "stale" });
+		expect(setSpy).not.toHaveBeenCalled();
 	});
 });

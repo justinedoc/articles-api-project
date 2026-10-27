@@ -146,23 +146,24 @@ Comments are available under `/api/v1/articles/:articleId/comments` and support 
 
 ## Development commands
 
-| Command                 | Description                               |
-| ----------------------- | ----------------------------------------- |
-| `pnpm dev`              | Start the API with watch mode.            |
-| `pnpm build`            | Type-check and build to `dist/`.          |
-| `pnpm start`            | Run the compiled API.                     |
-| `pnpm check`            | Run Biome checks.                         |
-| `pnpm lint`             | Apply Biome lint fixes.                   |
-| `pnpm format`           | Apply Biome formatting.                   |
-| `pnpm test`             | Run the complete test suite.              |
-| `pnpm test:unit`        | Run core unit tests.                      |
-| `pnpm test:integration` | Run module integration tests.             |
-| `pnpm test:e2e`         | Run end-to-end tests.                     |
-| `pnpm test:coverage`    | Run tests with coverage.                  |
-| `pnpm db:generate`      | Generate a migration from schema changes. |
-| `pnpm db:migrate`       | Apply committed migrations.               |
-| `pnpm db:studio`        | Open Drizzle Studio.                      |
-| `pnpm services:down`    | Stop local PostgreSQL and Redis.          |
+| Command              | Description                               |
+| -------------------- | ----------------------------------------- |
+| `pnpm dev`           | Start the API with watch mode.            |
+| `pnpm build`         | Type-check and build to `dist/`.          |
+| `pnpm start`         | Run the compiled API.                     |
+| `pnpm check`         | Run Biome checks.                         |
+| `pnpm lint`          | Apply Biome lint fixes.                   |
+| `pnpm format`        | Apply Biome formatting.                   |
+| `pnpm test`          | Run the complete test suite.              |
+| `pnpm test:core`     | Run core unit and infrastructure tests.   |
+| `pnpm test:service`  | Run module service layer tests.           |
+| `pnpm test:routes`   | Run route integration tests.              |
+| `pnpm test:e2e`      | Run end-to-end tests.                     |
+| `pnpm test:coverage` | Run tests with coverage.                  |
+| `pnpm db:generate`   | Generate a migration from schema changes. |
+| `pnpm db:migrate`    | Apply committed migrations.               |
+| `pnpm db:studio`     | Open Drizzle Studio.                      |
+| `pnpm services:down` | Stop local PostgreSQL and Redis.          |
 
 Before opening a pull request, run:
 
