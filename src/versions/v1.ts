@@ -6,6 +6,7 @@ import { authRouter } from "@/modules/auth";
 import { commentsRouter } from "@/modules/comments";
 import { healthRouter } from "@/modules/health";
 import { profilesRouter } from "@/modules/profiles";
+import { tagsRouter } from "@/modules/tags";
 
 export function getRoutesV1() {
 	const router = createRouter();
@@ -15,6 +16,7 @@ export function getRoutesV1() {
 	router.route("/account", accountRouter);
 	router.route("/profiles", profilesRouter);
 	router.route("/articles", articlesRouter);
+	router.route("/tags", tagsRouter);
 	router.route("/", commentsRouter);
 
 	configureOpenAPI(router, "v1");

@@ -13,6 +13,8 @@ import { cleanupTestUsers, createTestUser } from "@/core/test-utils";
 import {
 	createArticle,
 	deleteArticle,
+	getArticleLikesCount,
+	getTrendingArticles,
 	likeArticle,
 	listPublicArticles,
 	transitionArticle,
@@ -21,7 +23,15 @@ import {
 } from "../service";
 
 vi.mock("@/core/cache", () => ({
-	cache: { getOrSet: vi.fn(), del: vi.fn() },
+	cache: {
+		getOrSet: vi.fn((_key, fn) => fn()),
+		getRaw: vi.fn().mockResolvedValue(null),
+		set: vi.fn().mockResolvedValue(undefined),
+		del: vi.fn().mockResolvedValue(undefined),
+		incr: vi.fn().mockResolvedValue(1),
+		decr: vi.fn().mockResolvedValue(0),
+		invalidatePattern: vi.fn().mockResolvedValue(1),
+	},
 }));
 
 describe("Article Service (PostgreSQL integration)", () => {
@@ -149,6 +159,43 @@ describe("Article Service (PostgreSQL integration)", () => {
 			count: 0,
 			liked: false,
 		});
+
+		const countFromDb = await getArticleLikesCount(created.id);
+		expect(countFromDb).toBe(0);
+	});
+
+	it("retrieves curated trending articles sorted by engagement", async () => {
+		const userA = await createUser("trending-a");
+		const userB = await createUser("trending-b");
+
+		const art1 = await createArticle(userId, {
+			title: "Trending Article 1",
+			body: "Content 1",
+		});
+		await transitionArticle(art1.id, userId, "published");
+
+		const art2 = await createArticle(userId, {
+			title: "Trending Article 2",
+			body: "Content 2",
+		});
+		await transitionArticle(art2.id, userId, "published");
+
+		// art2 gets 2 likes, art1 gets 1 like
+		await likeArticle(art2.id, userA.id);
+		await likeArticle(art2.id, userB.id);
+		await likeArticle(art1.id, userA.id);
+
+		const trending = await getTrendingArticles(10);
+		expect(trending.length).toBeGreaterThanOrEqual(2);
+
+		const top = trending.find((a) => a.id === art2.id);
+		const second = trending.find((a) => a.id === art1.id);
+		expect(top).toBeDefined();
+		expect(second).toBeDefined();
+		expect(top?.likeCount).toBe(2);
+		expect(top?.engagementScore).toBe(4);
+		expect(second?.likeCount).toBe(1);
+		expect(second?.engagementScore).toBe(2);
 	});
 
 	it("cascades article, comment, tag, and like cleanup on account deletion", async () => {

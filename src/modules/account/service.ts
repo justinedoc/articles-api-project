@@ -4,7 +4,10 @@ import { cache } from "@/core/cache";
 import { db } from "@/core/db";
 import { article, profile, user } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
-import { getArticleCacheKey } from "@/modules/articles/service";
+import {
+	getArticleCacheKey,
+	getArticleLikesCountKey,
+} from "@/modules/articles/service";
 import {
 	getProfileUserCacheKey,
 	getProfileUsernameCacheKey,
@@ -71,7 +74,12 @@ export const deleteAccount = async (userId: string) => {
 		userProfile?.username
 			? cache.del(getProfileUsernameCacheKey(userProfile.username))
 			: Promise.resolve(),
-		...userArticles.map((a) => cache.del(getArticleCacheKey(a.id))),
+		...userArticles.flatMap((a) => [
+			cache.del(getArticleCacheKey(a.id)),
+			cache.del(getArticleLikesCountKey(a.id)),
+		]),
+		cache.invalidatePattern("articles:trending:*"),
+		cache.invalidatePattern("tags:popular:*"),
 	]);
 
 	return deleted;

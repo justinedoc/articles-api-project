@@ -8,6 +8,7 @@ import {
 	listPublic,
 	publish,
 	remove,
+	trending,
 	unlike,
 	update,
 } from "./handlers";
@@ -17,6 +18,7 @@ import {
 	deleteArticleRoute,
 	getOwnedArticleRoute,
 	getPublicArticleRoute,
+	getTrendingArticlesRoute,
 	likeArticleRoute,
 	listPublicArticlesRoute,
 	publishArticleRoute,
@@ -26,6 +28,7 @@ import {
 
 export const articlesRouter = createRouter()
 	.openapi(createArticleRoute, create)
+	.openapi(getTrendingArticlesRoute, trending)
 	.openapi(listPublicArticlesRoute, listPublic)
 	.openapi(getPublicArticleRoute, getPublic)
 	.openapi(getOwnedArticleRoute, getMine)

@@ -207,6 +207,63 @@ class CacheService {
 		inFlightRequests.set(key, fetchPromise);
 		return fetchPromise;
 	}
+
+	/**
+	 * Retrieve a raw string value from cache without JSON parsing.
+	 */
+	async getRaw(key: string): Promise<string | null> {
+		if (!isRedisAvailable()) return null;
+		try {
+			return await redis.get(key);
+		} catch (err) {
+			baseLogger.warn(
+				{ err: err instanceof Error ? err.message : err, key },
+				"Cache getRaw error",
+			);
+			return null;
+		}
+	}
+
+	/**
+	 * Atomically increment a counter in Redis with optional TTL if newly created.
+	 */
+	async incr(key: string, ttlSeconds = 3600): Promise<number | null> {
+		if (!isRedisAvailable()) return null;
+		try {
+			const count = await redis.incr(key);
+			if (count === 1 && ttlSeconds > 0) {
+				await redis.expire(key, ttlSeconds);
+			}
+			return count;
+		} catch (err) {
+			baseLogger.warn(
+				{ err: err instanceof Error ? err.message : err, key },
+				"Cache INCR error",
+			);
+			return null;
+		}
+	}
+
+	/**
+	 * Atomically decrement a counter in Redis, preventing negative counts.
+	 */
+	async decr(key: string): Promise<number | null> {
+		if (!isRedisAvailable()) return null;
+		try {
+			const count = await redis.decr(key);
+			if (count < 0) {
+				await redis.set(key, "0");
+				return 0;
+			}
+			return count;
+		} catch (err) {
+			baseLogger.warn(
+				{ err: err instanceof Error ? err.message : err, key },
+				"Cache DECR error",
+			);
+			return null;
+		}
+	}
 }
 
 export const cache = new CacheService();

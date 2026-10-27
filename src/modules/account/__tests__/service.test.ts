@@ -17,7 +17,12 @@ import { deleteAccount, getAccount, getAccountCacheKey } from "../service";
 vi.mock("@/core/cache", () => ({
 	cache: {
 		getOrSet: vi.fn(async (_key, fetchFn) => fetchFn()),
+		getRaw: vi.fn().mockResolvedValue(null),
+		set: vi.fn().mockResolvedValue(undefined),
 		del: vi.fn().mockResolvedValue(undefined),
+		incr: vi.fn().mockResolvedValue(1),
+		decr: vi.fn().mockResolvedValue(0),
+		invalidatePattern: vi.fn().mockResolvedValue(1),
 	},
 }));
 

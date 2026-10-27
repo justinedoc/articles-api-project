@@ -170,4 +170,24 @@ describe("Articles Routes Integration Tests", () => {
 		expect(json.success).toBe(true);
 		expect(json.data).toEqual({ count: 0, liked: false });
 	});
+
+	it("should return 200 OK and Cache-Control header on GET /articles/trending", async () => {
+		vi.spyOn(articleService, "getTrendingArticles").mockResolvedValue([
+			{
+				...mockArticle,
+				engagementScore: 10,
+				likeCount: 4,
+				commentCount: 2,
+			},
+		]);
+
+		const res = await app.request("/api/articles/trending");
+
+		expect(res.status).toBe(200);
+		expect(res.headers.get("Cache-Control")).toContain("public");
+		const json = await res.json();
+		expect(json.success).toBe(true);
+		expect(json.data).toHaveLength(1);
+		expect(json.data[0].engagementScore).toBe(10);
+	});
 });

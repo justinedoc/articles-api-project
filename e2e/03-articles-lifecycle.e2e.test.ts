@@ -298,4 +298,74 @@ describe("E2E: Articles Lifecycle & Social Interactions", () => {
 		const checkRes = await author.client.get(`/api/v1/articles/${articleId}`);
 		expect(checkRes.status).toBe(404);
 	});
+
+	it("should serve curated trending articles and popular tags with Cache-Control headers", async () => {
+		const author = await createE2EUser("author_trending");
+		const reader1 = await createE2EUser("reader_trend1");
+		const reader2 = await createE2EUser("reader_trend2");
+		createdUserIds.add(author.id);
+		createdUserIds.add(reader1.id);
+		createdUserIds.add(reader2.id);
+
+		// 1. Create and publish two articles with distinct tags
+		const art1Res = await author.client.post<{ data: { id: string } }>(
+			"/api/v1/articles",
+			{
+				title: "High Engagement AI Trends",
+				body: "Artificial Intelligence trends and insights.",
+				tags: ["ai", "trending-tech"],
+			},
+		);
+		const art1Id = art1Res.data.data.id;
+		await author.client.post(`/api/v1/articles/${art1Id}/publish`);
+
+		const art2Res = await author.client.post<{ data: { id: string } }>(
+			"/api/v1/articles",
+			{
+				title: "Low Engagement Quiet Article",
+				body: "Quiet article with less traffic.",
+				tags: ["misc"],
+			},
+		);
+		const art2Id = art2Res.data.data.id;
+		await author.client.post(`/api/v1/articles/${art2Id}/publish`);
+
+		// 2. Add likes to art1
+		await reader1.client.post(`/api/v1/articles/${art1Id}/like`);
+		await reader2.client.post(`/api/v1/articles/${art1Id}/like`);
+
+		// 3. Query trending endpoint
+		const trendingRes = await apiClient.get<{
+			success: boolean;
+			data: Array<{
+				id: string;
+				title: string;
+				likeCount: number;
+				engagementScore: number;
+			}>;
+		}>("/api/v1/articles/trending");
+
+		expect(trendingRes.status).toBe(200);
+		expect(trendingRes.headers.get("Cache-Control")).toContain("public");
+		expect(trendingRes.data.success).toBe(true);
+
+		const trendingArt1 = trendingRes.data.data.find((a) => a.id === art1Id);
+		expect(trendingArt1).toBeDefined();
+		expect(trendingArt1?.likeCount).toBe(2);
+		expect(trendingArt1?.engagementScore).toBeGreaterThanOrEqual(4);
+
+		// 4. Query popular tags endpoint
+		const tagsRes = await apiClient.get<{
+			success: boolean;
+			data: Array<{ id: string; name: string; articleCount: number }>;
+		}>("/api/v1/tags/popular");
+
+		expect(tagsRes.status).toBe(200);
+		expect(tagsRes.headers.get("Cache-Control")).toContain("public");
+		expect(tagsRes.data.success).toBe(true);
+
+		const aiTag = tagsRes.data.data.find((t) => t.name === "ai");
+		expect(aiTag).toBeDefined();
+		expect(aiTag?.articleCount).toBeGreaterThanOrEqual(1);
+	});
 });

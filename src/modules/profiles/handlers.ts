@@ -1,5 +1,6 @@
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { AppError } from "@/core/errors";
+import { setPublicCacheHeaders } from "@/core/server";
 import type { AppRouteHandler } from "@/core/types";
 import type {
 	GetMyProfileRoute,
@@ -42,6 +43,7 @@ export const getPublic: AppRouteHandler<GetPublicProfileRoute> = async (c) => {
 	const { username } = c.req.valid("param");
 
 	const result = await getPublicProfileByUsername(username);
+	setPublicCacheHeaders(c, 300, 900);
 
 	return c.json(
 		{

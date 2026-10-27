@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { AppError } from "@/core/errors";
+import { setPublicCacheHeaders } from "@/core/server";
 import type { AppBindings, AppRouteHandler } from "@/core/types";
 import type {
 	ArchiveArticleRoute,
@@ -8,6 +9,7 @@ import type {
 	DeleteArticleRoute,
 	GetOwnedArticleRoute,
 	GetPublicArticleRoute,
+	GetTrendingArticlesRoute,
 	LikeArticleRoute,
 	ListPublicArticlesRoute,
 	PublishArticleRoute,
@@ -19,6 +21,7 @@ import {
 	deleteArticle,
 	getOwnedArticle,
 	getPublicArticle,
+	getTrendingArticles,
 	likeArticle,
 	listPublicArticles,
 	transitionArticle,
@@ -43,8 +46,25 @@ export const create: AppRouteHandler<CreateArticleRoute> = async (c) => {
 	);
 };
 
+export const trending: AppRouteHandler<GetTrendingArticlesRoute> = async (
+	c,
+) => {
+	const { limit } = c.req.valid("query");
+	const result = await getTrendingArticles(limit);
+	setPublicCacheHeaders(c, 60, 300);
+	return c.json(
+		{
+			success: true,
+			message: "Trending articles retrieved successfully",
+			data: result,
+		},
+		httpStatusCodes.OK,
+	);
+};
+
 export const getPublic: AppRouteHandler<GetPublicArticleRoute> = async (c) => {
 	const result = await getPublicArticle(c.req.valid("param").id);
+	setPublicCacheHeaders(c, 60, 300);
 	return c.json(
 		{ success: true, message: "Article retrieved successfully", data: result },
 		httpStatusCodes.OK,

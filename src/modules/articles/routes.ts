@@ -13,6 +13,8 @@ import {
 	articleListQuerySchema,
 	articleSelectSchema,
 	articleUpdateSchema,
+	trendingArticleSchema,
+	trendingArticlesQuerySchema,
 } from "./schema";
 
 const tags = ["Articles"];
@@ -42,6 +44,26 @@ export const createArticleRoute = createRoute({
 	},
 	responses: {
 		[httpStatusCodes.CREATED]: articleResponse("Article created successfully"),
+		...defaultErrorResponses,
+	},
+});
+
+export const getTrendingArticlesRoute = createRoute({
+	method: "get",
+	path: "/trending",
+	summary: "List trending published articles",
+	tags,
+	request: { query: trendingArticlesQuerySchema },
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema(
+				"Trending articles retrieved successfully",
+				true,
+			).extend({
+				data: z.array(trendingArticleSchema),
+			}),
+			"Trending articles retrieved successfully",
+		),
 		...defaultErrorResponses,
 	},
 });
@@ -178,6 +200,7 @@ export const unlikeArticleRoute = createRoute({
 });
 
 export type CreateArticleRoute = typeof createArticleRoute;
+export type GetTrendingArticlesRoute = typeof getTrendingArticlesRoute;
 export type GetPublicArticleRoute = typeof getPublicArticleRoute;
 export type ListPublicArticlesRoute = typeof listPublicArticlesRoute;
 export type GetOwnedArticleRoute = typeof getOwnedArticleRoute;

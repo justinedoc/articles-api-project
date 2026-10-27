@@ -1,8 +1,14 @@
-import { and, count, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
-import { article, articleLike, articleTag, tag } from "@/core/db/schema";
+import {
+	article,
+	articleLike,
+	articleTag,
+	comment,
+	tag,
+} from "@/core/db/schema";
 import { AppError } from "@/core/errors";
 import { decodeCursor, encodeCursor } from "@/core/pagination";
 import { generateId } from "@/core/utils";
@@ -10,9 +16,14 @@ import type {
 	ArticleCreatePayload,
 	ArticleUpdatePayload,
 	SelectArticle,
+	TrendingArticle,
 } from "./schema";
 
 export const getArticleCacheKey = (id: string) => `articles:id:${id}`;
+export const getArticleLikesCountKey = (id: string) =>
+	`article:likes_count:${id}`;
+export const getTrendingArticlesKey = (limit: number) =>
+	`articles:trending:${limit}`;
 
 const slugify = (title: string) =>
 	title
@@ -82,15 +93,46 @@ const assertPublished = async (articleId: string) => {
 	}
 };
 
-const getLikeResult = async (articleId: string, userId: string) => {
-	const [result] = await db
-		.select({
-			count: count(),
-			liked: sql<boolean>`COALESCE(bool_or(${articleLike.userId} = ${userId}), false)`,
-		})
+/**
+ * gets the total like count for an article, backed by Redis and PostgreSQL.
+ */
+export const getArticleLikesCount = async (
+	articleId: string,
+): Promise<number> => {
+	const key = getArticleLikesCountKey(articleId);
+	const raw = await cache.getRaw(key);
+	if (raw !== null) {
+		const parsed = Number.parseInt(raw, 10);
+		if (!Number.isNaN(parsed)) return parsed;
+	}
+
+	// Cache miss: query PostgreSQL (SSOT)
+	const [record] = await db
+		.select({ count: count() })
 		.from(articleLike)
 		.where(eq(articleLike.articleId, articleId));
-	return { count: Number(result?.count ?? 0), liked: Boolean(result?.liked) };
+
+	const total = Number(record?.count ?? 0);
+	await cache.set(key, total, { ttlSeconds: 3600 });
+	return total;
+};
+
+const getLikeResult = async (articleId: string, userId: string) => {
+	const [totalCount, userLike] = await Promise.all([
+		getArticleLikesCount(articleId),
+		db
+			.select({ id: articleLike.userId })
+			.from(articleLike)
+			.where(
+				and(
+					eq(articleLike.articleId, articleId),
+					eq(articleLike.userId, userId),
+				),
+			)
+			.limit(1),
+	]);
+
+	return { count: totalCount, liked: userLike.length > 0 };
 };
 
 /**
@@ -156,14 +198,88 @@ export const getPublicArticle = async (id: string): Promise<SelectArticle> => {
 };
 
 /**
+ * retrieves curated trending articles based on engagement in the last 30 days.
+ * cached in redis with single-flight mutex protection.
+ */
+export const getTrendingArticles = async (
+	limit = 10,
+): Promise<TrendingArticle[]> => {
+	const key = getTrendingArticlesKey(limit);
+
+	const cached = await cache.getOrSet(
+		key,
+		async () => {
+			const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+			const rows = await db
+				.select({
+					id: article.id,
+					authorId: article.authorId,
+					title: article.title,
+					slug: article.slug,
+					excerpt: article.excerpt,
+					body: article.body,
+					status: article.status,
+					publishedAt: article.publishedAt,
+					createdAt: article.createdAt,
+					updatedAt: article.updatedAt,
+					likeCount: sql<number>`COUNT(DISTINCT ${articleLike.userId})::int`,
+					commentCount: sql<number>`COUNT(DISTINCT ${comment.id})::int`,
+					engagementScore: sql<number>`(COUNT(DISTINCT ${articleLike.userId}) * 2 + COUNT(DISTINCT ${comment.id}))::int`,
+				})
+				.from(article)
+				.leftJoin(articleLike, eq(articleLike.articleId, article.id))
+				.leftJoin(
+					comment,
+					and(eq(comment.articleId, article.id), isNull(comment.deletedAt)),
+				)
+				.where(
+					and(
+						eq(article.status, "published"),
+						gt(article.publishedAt, thirtyDaysAgo),
+					),
+				)
+				.groupBy(article.id)
+				.orderBy(
+					sql`(COUNT(DISTINCT ${articleLike.userId}) * 2 + COUNT(DISTINCT ${comment.id})) DESC`,
+					desc(article.publishedAt),
+				)
+				.limit(limit);
+
+			return rows.map((r) => ({
+				...r,
+				likeCount: Number(r.likeCount || 0),
+				commentCount: Number(r.commentCount || 0),
+				engagementScore: Number(r.engagementScore || 0),
+			}));
+		},
+		{ ttlSeconds: 300, jitter: true },
+	);
+
+	return cached ?? [];
+};
+
+/**
  * adds a like to a published article for the user.
  */
 export const likeArticle = async (articleId: string, userId: string) => {
 	await assertPublished(articleId);
-	await db
+	const inserted = await db
 		.insert(articleLike)
 		.values({ articleId, userId })
-		.onConflictDoNothing();
+		.onConflictDoNothing()
+		.returning({ userId: articleLike.userId });
+
+	const key = getArticleLikesCountKey(articleId);
+	if (inserted.length > 0) {
+		const cached = await cache.getRaw(key);
+		if (cached !== null) {
+			await cache.incr(key);
+		} else {
+			await getArticleLikesCount(articleId);
+		}
+	}
+
 	return getLikeResult(articleId, userId);
 };
 
@@ -172,11 +288,23 @@ export const likeArticle = async (articleId: string, userId: string) => {
  */
 export const unlikeArticle = async (articleId: string, userId: string) => {
 	await assertPublished(articleId);
-	await db
+	const deleted = await db
 		.delete(articleLike)
 		.where(
 			and(eq(articleLike.articleId, articleId), eq(articleLike.userId, userId)),
-		);
+		)
+		.returning({ userId: articleLike.userId });
+
+	const key = getArticleLikesCountKey(articleId);
+	if (deleted.length > 0) {
+		const cached = await cache.getRaw(key);
+		if (cached !== null) {
+			await cache.decr(key);
+		} else {
+			await getArticleLikesCount(articleId);
+		}
+	}
+
 	return getLikeResult(articleId, userId);
 };
 
@@ -357,7 +485,11 @@ export const transitionArticle = async (
 	if (!updated) {
 		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
 	}
-	await cache.del(getArticleCacheKey(id));
+	await Promise.all([
+		cache.del(getArticleCacheKey(id)),
+		cache.invalidatePattern("articles:trending:*"),
+		cache.invalidatePattern("tags:popular:*"),
+	]);
 	return updated;
 };
 
@@ -368,5 +500,10 @@ export const deleteArticle = async (id: string, userId: string) => {
 	const current = await getArticleOrThrow(id);
 	assertOwner(current, userId);
 	await db.delete(article).where(eq(article.id, id));
-	await cache.del(getArticleCacheKey(id));
+	await Promise.all([
+		cache.del(getArticleCacheKey(id)),
+		cache.del(getArticleLikesCountKey(id)),
+		cache.invalidatePattern("articles:trending:*"),
+		cache.invalidatePattern("tags:popular:*"),
+	]);
 };
