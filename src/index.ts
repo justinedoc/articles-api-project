@@ -1,14 +1,10 @@
 import { serve } from "@hono/node-server";
 import { initRedis } from "@/core/redis";
-import { createApp, shutdownApp } from "@/core/server";
+import { shutdownApp } from "@/core/server";
 import { env } from "@/env";
-import { getRoutesV1 } from "@/versions";
+import app from "./app";
 
 await initRedis();
-
-const app = createApp();
-
-const routes = app.route("/v1", getRoutesV1());
 
 const server = serve(
 	{
@@ -24,5 +20,5 @@ const server = serve(
 process.on("SIGINT", () => shutdownApp("SIGINT", server));
 process.on("SIGTERM", () => shutdownApp("SIGTERM", server));
 
-export type AppType = typeof routes;
+export { app };
 export default app;
