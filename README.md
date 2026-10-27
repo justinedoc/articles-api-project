@@ -189,9 +189,9 @@ src/
 │   ├── auth/             # Better Auth route adapter
 │   ├── health/           # Dependency health check
 │   └── profiles/         # Author profile endpoints and services
+├── versions/             # Versioned route compositions (v1, ...)
 ├── env.ts                # Environment schema and validation
-├── index.ts              # Application entry point
-└── versions.ts           # Versioned route composition
+└── index.ts              # Application entry point
 ```
 
 ## Database workflow
