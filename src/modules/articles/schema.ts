@@ -102,8 +102,52 @@ export const trendingArticlesQuerySchema = z.object({
 	}),
 });
 
+export const ownArticlesQuerySchema = cursorPaginationQuerySchema.extend({
+	status: z
+		.enum(["draft", "published", "archived"])
+		.optional()
+		.openapi({
+			param: {
+				name: "status",
+				in: "query",
+			},
+			description:
+				"Filter own articles by status (draft, published, or archived)",
+			example: "draft",
+		}),
+	tag: z
+		.string()
+		.trim()
+		.min(1)
+		.max(50)
+		.optional()
+		.openapi({
+			param: {
+				name: "tag",
+				in: "query",
+			},
+			description: "Filter own articles by tag name",
+			example: "typescript",
+		}),
+	search: z
+		.string()
+		.trim()
+		.min(1)
+		.max(100)
+		.optional()
+		.openapi({
+			param: {
+				name: "search",
+				in: "query",
+			},
+			description: "Search own articles matching title and content",
+			example: "architecture",
+		}),
+});
+
 export type ArticleCreatePayload = z.infer<typeof articleCreateSchema>;
 export type ArticleUpdatePayload = z.infer<typeof articleUpdateSchema>;
 export type SelectArticle = z.infer<typeof articleSelectSchema>;
 export type TrendingArticle = z.infer<typeof trendingArticleSchema>;
 export type TrendingArticlesQuery = z.infer<typeof trendingArticlesQuerySchema>;
+export type OwnArticlesQuery = z.infer<typeof ownArticlesQuerySchema>;

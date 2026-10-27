@@ -16,6 +16,7 @@ import {
 	getArticleLikesCount,
 	getTrendingArticles,
 	likeArticle,
+	listOwnedArticles,
 	listPublicArticles,
 	transitionArticle,
 	unlikeArticle,
@@ -235,5 +236,63 @@ describe("Article Service (PostgreSQL integration)", () => {
 		expect(remaining).toEqual([]);
 		expect(remainingLinks).toEqual([]);
 		expect(remainingLikes).toEqual([]);
+	});
+
+	it("lists owned articles with status filtering and pagination", async () => {
+		const otherUser = await createUser("other-author");
+
+		// Create articles for primary author
+		const draft1 = await createArticle(userId, {
+			title: "Draft 1",
+			body: "First draft",
+			tags: ["typescript"],
+		});
+		const draft2 = await createArticle(userId, {
+			title: "Draft 2",
+			body: "Second draft",
+			tags: ["testing"],
+		});
+		const pub = await createArticle(userId, {
+			title: "Published Article",
+			body: "Live content",
+			tags: ["typescript"],
+		});
+		await transitionArticle(pub.id, userId, "published");
+
+		// Create article for other author
+		await createArticle(otherUser.id, {
+			title: "Other Author Article",
+			body: "Should not be listed",
+		});
+
+		// 1. List all owned articles (no status filter)
+		const allOwned = await listOwnedArticles(userId, undefined, 10);
+		expect(allOwned.data.length).toBe(3);
+		expect(allOwned.data.map((a) => a.id).sort()).toEqual(
+			[draft1.id, draft2.id, pub.id].sort(),
+		);
+
+		// 2. Filter by status = "draft"
+		const draftsOnly = await listOwnedArticles(userId, undefined, 10, "draft");
+		expect(draftsOnly.data.length).toBe(2);
+		expect(draftsOnly.data.every((a) => a.status === "draft")).toBe(true);
+
+		// 3. Filter by status = "published"
+		const pubOnly = await listOwnedArticles(userId, undefined, 10, "published");
+		expect(pubOnly.data.length).toBe(1);
+		expect(pubOnly.data[0].id).toBe(pub.id);
+
+		// 4. Cursor pagination on owned articles
+		const page1 = await listOwnedArticles(userId, undefined, 1);
+		expect(page1.data.length).toBe(1);
+		expect(page1.nextCursor).toBeDefined();
+
+		const page2 = await listOwnedArticles(
+			userId,
+			page1.nextCursor ?? undefined,
+			1,
+		);
+		expect(page2.data.length).toBe(1);
+		expect(page2.data[0].id).not.toBe(page1.data[0].id);
 	});
 });

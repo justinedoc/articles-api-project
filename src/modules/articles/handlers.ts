@@ -11,6 +11,7 @@ import type {
 	GetPublicArticleRoute,
 	GetTrendingArticlesRoute,
 	LikeArticleRoute,
+	ListOwnedArticlesRoute,
 	ListPublicArticlesRoute,
 	PublishArticleRoute,
 	UnlikeArticleRoute,
@@ -23,6 +24,7 @@ import {
 	getPublicArticle,
 	getTrendingArticles,
 	likeArticle,
+	listOwnedArticles,
 	listPublicArticles,
 	transitionArticle,
 	unlikeArticle,
@@ -80,6 +82,27 @@ export const listPublic: AppRouteHandler<ListPublicArticlesRoute> = async (
 		{
 			success: true,
 			message: "Articles retrieved successfully",
+			data: result,
+		},
+		httpStatusCodes.OK,
+	);
+};
+
+export const listMine: AppRouteHandler<ListOwnedArticlesRoute> = async (c) => {
+	const user = authenticatedUser(c);
+	const { cursor, limit, status, tag, search } = c.req.valid("query");
+	const result = await listOwnedArticles(
+		user.id,
+		cursor,
+		limit,
+		status,
+		tag,
+		search,
+	);
+	return c.json(
+		{
+			success: true,
+			message: "Owned articles retrieved successfully",
 			data: result,
 		},
 		httpStatusCodes.OK,

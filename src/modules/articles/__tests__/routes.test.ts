@@ -190,4 +190,40 @@ describe("Articles Routes Integration Tests", () => {
 		expect(json.data).toHaveLength(1);
 		expect(json.data[0].engagementScore).toBe(10);
 	});
+
+	it("should return 401 Unauthorized on GET /articles/mine without auth", async () => {
+		vi.spyOn(auth.api, "getSession").mockResolvedValue(null);
+
+		const res = await app.request("/api/articles/mine");
+
+		expect(res.status).toBe(401);
+		const json = await res.json();
+		expect(json.success).toBe(false);
+	});
+
+	it("should return 200 OK on GET /articles/mine for authenticated user", async () => {
+		const session = createMockSession({ id: "usr_123" });
+		vi.spyOn(auth.api, "getSession").mockResolvedValue(session);
+		vi.spyOn(articleService, "listOwnedArticles").mockResolvedValue({
+			data: [mockArticle],
+			nextCursor: null,
+		});
+
+		const res = await app.request(
+			"/api/articles/mine?status=published&limit=10",
+		);
+
+		expect(res.status).toBe(200);
+		const json = await res.json();
+		expect(json.success).toBe(true);
+		expect(json.data.data).toHaveLength(1);
+		expect(articleService.listOwnedArticles).toHaveBeenCalledWith(
+			"usr_123",
+			undefined,
+			10,
+			"published",
+			undefined,
+			undefined,
+		);
+	});
 });

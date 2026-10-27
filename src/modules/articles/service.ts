@@ -376,6 +376,78 @@ export const listPublicArticles = async (
 };
 
 /**
+ * lists articles owned by an author with optional status filter, tag, search, and cursor pagination.
+ */
+export const listOwnedArticles = async (
+	userId: string,
+	cursor: string | undefined,
+	limit: number,
+	status?: "draft" | "published" | "archived",
+	tagName?: string,
+	searchTerm?: string,
+) => {
+	const conditions = [eq(article.authorId, userId)];
+	if (status) {
+		conditions.push(eq(article.status, status));
+	}
+	const normalizedTag = tagName?.trim().toLowerCase();
+	const normalizedSearch = searchTerm?.trim();
+	if (normalizedSearch) {
+		conditions.push(
+			sql`to_tsvector('english', ${article.title} || ' ' || ${article.body}) @@ plainto_tsquery('english', ${normalizedSearch})` as never,
+		);
+	}
+	if (cursor) {
+		const decoded = decodeCursor(cursor);
+		conditions.push(
+			or(
+				lt(article.createdAt, decoded.createdAt),
+				and(
+					eq(article.createdAt, decoded.createdAt),
+					lt(article.id, decoded.id),
+				),
+			) as never,
+		);
+	}
+
+	const records = normalizedTag
+		? (
+				await db
+					.select({ article })
+					.from(article)
+					.innerJoin(articleTag, eq(articleTag.articleId, article.id))
+					.innerJoin(
+						tag,
+						and(eq(tag.id, articleTag.tagId), eq(tag.name, normalizedTag)),
+					)
+					.where(and(...conditions))
+					.orderBy(desc(article.createdAt), desc(article.id))
+					.limit(limit + 1)
+			).map((record) => record.article)
+		: await db
+				.select()
+				.from(article)
+				.where(and(...conditions))
+				.orderBy(desc(article.createdAt), desc(article.id))
+				.limit(limit + 1);
+
+	const hasNextPage = records.length > limit;
+	const data = hasNextPage ? records.slice(0, limit) : records;
+	const last = data[data.length - 1];
+
+	return {
+		data,
+		nextCursor:
+			hasNextPage && last
+				? encodeCursor({
+						createdAt: last.createdAt,
+						id: last.id,
+					})
+				: null,
+	};
+};
+
+/**
  * retrieves an article verifying the requesting user is the author.
  */
 export const getOwnedArticle = async (

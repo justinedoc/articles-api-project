@@ -4,10 +4,6 @@ import { closeRedis } from "@/core/redis";
 
 let isShuttingDown = false;
 
-export function resetShutdownStateForTesting() {
-	isShuttingDown = false;
-}
-
 export function shutdownApp(signal: string, server: ServerType): Promise<void> {
 	if (isShuttingDown) {
 		console.log(`\nSecond ${signal} received. Forcing immediate exit.`);

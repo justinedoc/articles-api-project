@@ -47,11 +47,36 @@ describe("E2E: Articles Lifecycle & Social Interactions", () => {
 		expect(authorView.status).toBe(200);
 		expect(authorView.data.data.status).toBe("draft");
 
-		// 3. Reader cannot view unpublished draft (returns 404)
+		// 3. Author can list their own articles via /articles/mine
+		const authorMineList = await author.client.get<{
+			data: {
+				data: Array<{ id: string; status: string }>;
+				nextCursor: string | null;
+			};
+		}>("/api/v1/articles/mine");
+		expect(authorMineList.status).toBe(200);
+		expect(authorMineList.data.data.data.some((a) => a.id === articleId)).toBe(
+			true,
+		);
+
+		// 4. Author can filter own articles by status=draft
+		const authorDrafts = await author.client.get<{
+			data: { data: Array<{ id: string; status: string }> };
+		}>("/api/v1/articles/mine?status=draft");
+		expect(authorDrafts.status).toBe(200);
+		expect(authorDrafts.data.data.data.every((a) => a.status === "draft")).toBe(
+			true,
+		);
+
+		// 5. Unauthenticated request to /articles/mine is rejected with 401
+		const unauthMine = await apiClient.get("/api/v1/articles/mine");
+		expect(unauthMine.status).toBe(401);
+
+		// 6. Reader cannot view unpublished draft (returns 404)
 		const readerView = await reader.client.get(`/api/v1/articles/${articleId}`);
 		expect(readerView.status).toBe(404);
 
-		// 4. Public unauthenticated request cannot view draft (returns 404)
+		// 7. Public unauthenticated request cannot view draft (returns 404)
 		const publicView = await apiClient.get(`/api/v1/articles/${articleId}`);
 		expect(publicView.status).toBe(404);
 	});

@@ -13,6 +13,7 @@ import {
 	articleListQuerySchema,
 	articleSelectSchema,
 	articleUpdateSchema,
+	ownArticlesQuerySchema,
 	trendingArticleSchema,
 	trendingArticlesQuerySchema,
 } from "./schema";
@@ -92,6 +93,27 @@ export const listPublicArticlesRoute = createRoute({
 				data: cursorPaginationResultSchema(articleSelectSchema),
 			}),
 			"Articles retrieved successfully",
+		),
+		...defaultErrorResponses,
+	},
+});
+
+export const listOwnedArticlesRoute = createRoute({
+	method: "get",
+	path: "/mine",
+	summary: "List authenticated author's owned articles",
+	tags,
+	security,
+	middleware: [authMiddleware],
+	request: { query: ownArticlesQuerySchema },
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema("Owned articles retrieved successfully", true).extend(
+				{
+					data: cursorPaginationResultSchema(articleSelectSchema),
+				},
+			),
+			"Owned articles retrieved successfully",
 		),
 		...defaultErrorResponses,
 	},
@@ -203,6 +225,7 @@ export type CreateArticleRoute = typeof createArticleRoute;
 export type GetTrendingArticlesRoute = typeof getTrendingArticlesRoute;
 export type GetPublicArticleRoute = typeof getPublicArticleRoute;
 export type ListPublicArticlesRoute = typeof listPublicArticlesRoute;
+export type ListOwnedArticlesRoute = typeof listOwnedArticlesRoute;
 export type GetOwnedArticleRoute = typeof getOwnedArticleRoute;
 export type UpdateArticleRoute = typeof updateArticleRoute;
 export type DeleteArticleRoute = typeof deleteArticleRoute;

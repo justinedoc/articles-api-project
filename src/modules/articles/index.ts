@@ -5,6 +5,7 @@ import {
 	getMine,
 	getPublic,
 	like,
+	listMine,
 	listPublic,
 	publish,
 	remove,
@@ -20,6 +21,7 @@ import {
 	getPublicArticleRoute,
 	getTrendingArticlesRoute,
 	likeArticleRoute,
+	listOwnedArticlesRoute,
 	listPublicArticlesRoute,
 	publishArticleRoute,
 	unlikeArticleRoute,
@@ -29,6 +31,7 @@ import {
 export const articlesRouter = createRouter()
 	.openapi(createArticleRoute, create)
 	.openapi(getTrendingArticlesRoute, trending)
+	.openapi(listOwnedArticlesRoute, listMine)
 	.openapi(listPublicArticlesRoute, listPublic)
 	.openapi(getPublicArticleRoute, getPublic)
 	.openapi(getOwnedArticleRoute, getMine)
