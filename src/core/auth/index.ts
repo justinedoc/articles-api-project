@@ -35,10 +35,10 @@ export const auth = betterAuth({
 			create: {
 				after: async (createdUser) => {
 					try {
-						const { getOrCreateProfile } = await import(
+						const { createProfile } = await import(
 							"@/modules/profiles/service"
 						);
-						await getOrCreateProfile(createdUser.id);
+						await createProfile(createdUser.id);
 					} catch (err) {
 						console.error(
 							"Failed to auto-create profile on user registration:",

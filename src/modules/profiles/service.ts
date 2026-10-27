@@ -37,12 +37,12 @@ export async function generateUniqueUsername(
 }
 
 /**
- * Gets or initializes author profile for a given user.
- * Automatically handles seeding the profile from the auth `user` record.
+ * Retrieves the author profile for a given user by their user ID.
+ * Pure query - reads composite profile (joined with user table) and caches in Redis.
  */
-export const getOrCreateProfile = async (
+export const getProfileByUserId = async (
 	userId: string,
-): Promise<SelectProfile> => {
+): Promise<SelectProfile | null> => {
 	const profileData = await cache.getOrSet(
 		getProfileUserCacheKey(userId),
 		async () => {
@@ -64,69 +64,7 @@ export const getOrCreateProfile = async (
 				.innerJoin(user, eq(user.id, profile.userId))
 				.where(eq(profile.userId, userId));
 
-			if (existingProfile) {
-				return existingProfile;
-			}
-
-			// If profile does not exist, fetch user to initialize it
-			const [userData] = await db
-				.select()
-				.from(user)
-				.where(eq(user.id, userId));
-
-			if (!userData) {
-				return null;
-			}
-
-			const baseUsername = await generateUniqueUsername(
-				userData.name || userData.email,
-			);
-
-			for (let attempt = 0; attempt < 10; attempt++) {
-				const username =
-					attempt === 0
-						? baseUsername
-						: `${baseUsername}_${crypto.randomBytes(2).toString("hex")}`;
-				const [newProfile] = await db
-					.insert(profile)
-					.values({
-						id: generateId(),
-						userId,
-						username,
-						socialLinks: {},
-					})
-					.onConflictDoNothing()
-					.returning();
-
-				if (newProfile) {
-					return {
-						...newProfile,
-						displayName: userData.name,
-						avatarUrl: userData.image,
-					};
-				}
-
-				const [existing] = await db
-					.select({
-						id: profile.id,
-						userId: profile.userId,
-						username: profile.username,
-						displayName: user.name,
-						bio: profile.bio,
-						avatarUrl: user.image,
-						bannerUrl: profile.bannerUrl,
-						websiteUrl: profile.websiteUrl,
-						socialLinks: profile.socialLinks,
-						createdAt: profile.createdAt,
-						updatedAt: profile.updatedAt,
-					})
-					.from(profile)
-					.innerJoin(user, eq(user.id, profile.userId))
-					.where(eq(profile.userId, userId));
-				if (existing) return existing;
-			}
-
-			return null;
+			return existingProfile ?? null;
 		},
 		{
 			ttlSeconds: 600,
@@ -136,17 +74,95 @@ export const getOrCreateProfile = async (
 		},
 	);
 
-	if (!profileData) {
-		throw new AppError("User not found", httpStatusCodes.NOT_FOUND);
-	}
-
 	return profileData;
 };
 
 /**
+ * Creates an author profile for a user.
+ * Explicit write command - derives handle, inserts profile record, and primes caches.
+ */
+export const createProfile = async (
+	userId: string,
+	initialUsername?: string,
+): Promise<SelectProfile> => {
+	// Verify user exists
+	const [userData] = await db.select().from(user).where(eq(user.id, userId));
+
+	if (!userData) {
+		throw new AppError("User not found", httpStatusCodes.NOT_FOUND);
+	}
+
+	const baseUsername = initialUsername
+		? initialUsername
+				.toLowerCase()
+				.replace(/[^a-z0-9_-]/g, "")
+				.slice(0, 20)
+		: await generateUniqueUsername(userData.name || userData.email);
+
+	for (let attempt = 0; attempt < 10; attempt++) {
+		const username =
+			attempt === 0
+				? baseUsername
+				: `${baseUsername}_${crypto.randomBytes(2).toString("hex")}`;
+
+		const [newProfile] = await db
+			.insert(profile)
+			.values({
+				id: generateId(),
+				userId,
+				username,
+				socialLinks: {},
+			})
+			.onConflictDoNothing()
+			.returning();
+
+		if (newProfile) {
+			const created: SelectProfile = {
+				...newProfile,
+				displayName: userData.name,
+				avatarUrl: userData.image,
+			};
+
+			// Invalidate cache so subsequent gets immediately hit
+			await Promise.all([
+				cache.del(getProfileUserCacheKey(userId)),
+				cache.del(getProfileUsernameCacheKey(created.username)),
+			]);
+
+			return created;
+		}
+
+		// If profile already exists (conflict on userId or concurrent creation)
+		const existing = await getProfileByUserId(userId);
+		if (existing) {
+			return existing;
+		}
+	}
+
+	throw new AppError(
+		"Unable to generate unique author handle",
+		httpStatusCodes.CONFLICT,
+	);
+};
+
+/**
+ * Gets author profile, or initializes it if not yet created.
+ * Acts as a resilient fallback facade for authenticated user profile retrieval.
+ */
+export const getOrCreateProfile = async (
+	userId: string,
+): Promise<SelectProfile> => {
+	const existing = await getProfileByUserId(userId);
+	if (existing) {
+		return existing;
+	}
+
+	return createProfile(userId);
+};
+
+/**
  * Retrieves a public author profile by unique username.
- * Reads personal identity from the joined user record.
- * Cached in Redis for fast access.
+ * Cached
  */
 export const getPublicProfileByUsername = async (
 	username: string,
@@ -191,8 +207,6 @@ export const getPublicProfileByUsername = async (
 
 /**
  * Updates the author's profile.
- * Updates displayName (user.name) and avatarUrl (user.image) directly in the user record,
- * while author metadata is updated in the profile record.
  */
 export const updateProfile = async (
 	userId: string,

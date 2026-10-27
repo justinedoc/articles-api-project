@@ -4,7 +4,9 @@ import { cache } from "@/core/cache";
 import { db } from "@/core/db";
 import { AppError } from "@/core/errors";
 import {
+	createProfile,
 	getOrCreateProfile,
+	getProfileByUserId,
 	getPublicProfileByUsername,
 	updateProfile,
 } from "../service";
@@ -37,8 +39,8 @@ describe("Profiles Service", () => {
 		);
 	});
 
-	describe("getOrCreateProfile", () => {
-		it("should return the existing profile from cache/db", async () => {
+	describe("getProfileByUserId", () => {
+		it("should return the profile from cache or database", async () => {
 			const mockProfile = {
 				id: "prof_1",
 				userId: "usr_1",
@@ -66,7 +68,7 @@ describe("Profiles Service", () => {
 				selectMock as unknown as ReturnType<typeof db.select>,
 			);
 
-			const result = await getOrCreateProfile("usr_1");
+			const result = await getProfileByUserId("usr_1");
 			expect(result).toEqual(mockProfile);
 			expect(cache.getOrSet).toHaveBeenCalledWith(
 				"profiles:user:usr_1",
@@ -75,7 +77,41 @@ describe("Profiles Service", () => {
 			);
 		});
 
-		it("should automatically initialize and seed profile from user if profile does not exist", async () => {
+		it("should return null if profile does not exist", async () => {
+			vi.mocked(cache.getOrSet).mockImplementation(
+				async (_key, fetchFn) => await fetchFn(),
+			);
+
+			const selectMock = {
+				from: vi.fn().mockReturnThis(),
+				innerJoin: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([]),
+			};
+			vi.mocked(db.select).mockReturnValue(
+				selectMock as unknown as ReturnType<typeof db.select>,
+			);
+
+			const result = await getProfileByUserId("usr_missing");
+			expect(result).toBeNull();
+		});
+	});
+
+	describe("createProfile", () => {
+		it("should throw 404 AppError if user does not exist", async () => {
+			const selectMock = {
+				from: vi.fn().mockReturnThis(),
+				where: vi.fn().mockResolvedValue([]),
+			};
+			vi.mocked(db.select).mockReturnValue(
+				selectMock as unknown as ReturnType<typeof db.select>,
+			);
+
+			await expect(createProfile("usr_missing")).rejects.toThrow(
+				new AppError("User not found", httpStatusCodes.NOT_FOUND),
+			);
+		});
+
+		it("should create profile derived from user and prime caches", async () => {
 			const mockUser = {
 				id: "usr_2",
 				name: "Bob Jones",
@@ -83,13 +119,11 @@ describe("Profiles Service", () => {
 				image: "https://example.com/bob.jpg",
 			};
 
-			const createdProfile = {
+			const rawCreatedProfile = {
 				id: "prof_2",
 				userId: "usr_2",
 				username: "bobjones",
-				displayName: "Bob Jones",
 				bio: null,
-				avatarUrl: "https://example.com/bob.jpg",
 				bannerUrl: null,
 				websiteUrl: null,
 				socialLinks: {},
@@ -97,29 +131,17 @@ describe("Profiles Service", () => {
 				updatedAt: new Date(),
 			};
 
-			vi.mocked(cache.getOrSet).mockImplementation(
-				async (_key, fetchFn) => await fetchFn(),
-			);
-
-			// First select: profile check (empty)
-			// Second select: user check (found)
-			// Third select: generateUniqueUsername username collision check (empty)
 			let selectCall = 0;
 			vi.mocked(db.select).mockImplementation(() => {
 				selectCall++;
 				if (selectCall === 1) {
-					return {
-						from: vi.fn().mockReturnThis(),
-						innerJoin: vi.fn().mockReturnThis(),
-						where: vi.fn().mockResolvedValue([]),
-					} as unknown as ReturnType<typeof db.select>;
-				}
-				if (selectCall === 2) {
+					// User check
 					return {
 						from: vi.fn().mockReturnThis(),
 						where: vi.fn().mockResolvedValue([mockUser]),
 					} as unknown as ReturnType<typeof db.select>;
 				}
+				// Username collision check
 				return {
 					from: vi.fn().mockReturnThis(),
 					where: vi.fn().mockResolvedValue([]),
@@ -129,23 +151,101 @@ describe("Profiles Service", () => {
 			const insertMock = {
 				values: vi.fn().mockReturnThis(),
 				onConflictDoNothing: vi.fn().mockReturnThis(),
-				returning: vi.fn().mockResolvedValue([createdProfile]),
+				returning: vi.fn().mockResolvedValue([rawCreatedProfile]),
+			};
+			vi.mocked(db.insert).mockReturnValue(
+				insertMock as unknown as ReturnType<typeof db.insert>,
+			);
+
+			const result = await createProfile("usr_2");
+			expect(result).toEqual({
+				...rawCreatedProfile,
+				displayName: "Bob Jones",
+				avatarUrl: "https://example.com/bob.jpg",
+			});
+			expect(db.insert).toHaveBeenCalled();
+			expect(cache.del).toHaveBeenCalledWith("profiles:user:usr_2");
+			expect(cache.del).toHaveBeenCalledWith("profiles:username:bobjones");
+		});
+	});
+
+	describe("getOrCreateProfile", () => {
+		it("should return the existing profile if found by getProfileByUserId", async () => {
+			const mockProfile = {
+				id: "prof_1",
+				userId: "usr_1",
+				username: "alice",
+				displayName: "Alice Smith",
+				bio: "Author bio",
+				avatarUrl: "https://example.com/avatar.jpg",
+				bannerUrl: null,
+				websiteUrl: null,
+				socialLinks: {},
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			};
+
+			vi.mocked(cache.getOrSet).mockResolvedValue(mockProfile);
+
+			const result = await getOrCreateProfile("usr_1");
+			expect(result).toEqual(mockProfile);
+		});
+
+		it("should fallback to createProfile if profile does not exist", async () => {
+			const mockUser = {
+				id: "usr_2",
+				name: "Bob Jones",
+				email: "bob@example.com",
+				image: "https://example.com/bob.jpg",
+			};
+
+			const rawCreatedProfile = {
+				id: "prof_2",
+				userId: "usr_2",
+				username: "bobjones",
+				bio: null,
+				bannerUrl: null,
+				websiteUrl: null,
+				socialLinks: {},
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			};
+
+			// getProfileByUserId returns null from cache
+			vi.mocked(cache.getOrSet).mockResolvedValue(null);
+
+			let selectCall = 0;
+			vi.mocked(db.select).mockImplementation(() => {
+				selectCall++;
+				if (selectCall === 1) {
+					// User check in createProfile
+					return {
+						from: vi.fn().mockReturnThis(),
+						where: vi.fn().mockResolvedValue([mockUser]),
+					} as unknown as ReturnType<typeof db.select>;
+				}
+				// Username collision check
+				return {
+					from: vi.fn().mockReturnThis(),
+					where: vi.fn().mockResolvedValue([]),
+				} as unknown as ReturnType<typeof db.select>;
+			});
+
+			const insertMock = {
+				values: vi.fn().mockReturnThis(),
+				onConflictDoNothing: vi.fn().mockReturnThis(),
+				returning: vi.fn().mockResolvedValue([rawCreatedProfile]),
 			};
 			vi.mocked(db.insert).mockReturnValue(
 				insertMock as unknown as ReturnType<typeof db.insert>,
 			);
 
 			const result = await getOrCreateProfile("usr_2");
-			expect(result).toEqual(createdProfile);
-			expect(db.insert).toHaveBeenCalled();
-		});
-
-		it("should throw 404 AppError if user does not exist", async () => {
-			vi.mocked(cache.getOrSet).mockResolvedValue(null);
-
-			await expect(getOrCreateProfile("usr_missing")).rejects.toThrow(
-				new AppError("User not found", httpStatusCodes.NOT_FOUND),
-			);
+			expect(result).toEqual({
+				...rawCreatedProfile,
+				displayName: "Bob Jones",
+				avatarUrl: "https://example.com/bob.jpg",
+			});
 		});
 	});
 
