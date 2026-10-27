@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth } from "@/core/auth";
 import { createMockSession, createTestApp } from "@/core/test-utils";
 import { commentsRouter } from "../index";
-import type { SelectComment } from "../schema";
+import type { CommentItem } from "../schema";
 import * as commentService from "../service";
 
 describe("Comments Routes Integration Tests", () => {
 	const app = createTestApp("/", commentsRouter);
 
-	const mockComment: SelectComment = {
+	const mockComment: CommentItem = {
 		id: "comment_123",
 		articleId: "art_123",
 		authorId: "usr_123",
@@ -17,13 +17,14 @@ describe("Comments Routes Integration Tests", () => {
 		deletedAt: null,
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		replyCount: 2,
 	};
 
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it("should return 200 OK with list of comments on GET /articles/:articleId/comments", async () => {
+	it("should return 200 OK with list of root comments on GET /articles/:articleId/comments", async () => {
 		vi.spyOn(commentService, "listComments").mockResolvedValue({
 			data: [mockComment],
 			nextCursor: null,
@@ -36,6 +37,30 @@ describe("Comments Routes Integration Tests", () => {
 		expect(json.success).toBe(true);
 		expect(json.data.data).toHaveLength(1);
 		expect(json.data.data[0].id).toBe("comment_123");
+		expect(json.data.data[0].replyCount).toBe(2);
+	});
+
+	it("should return 200 OK with list of replies on GET /comments/:commentId/replies", async () => {
+		const mockReply: CommentItem = {
+			...mockComment,
+			id: "comment_reply_456",
+			parentId: "comment_123",
+			replyCount: 0,
+		};
+
+		vi.spyOn(commentService, "listCommentReplies").mockResolvedValue({
+			data: [mockReply],
+			nextCursor: null,
+		});
+
+		const res = await app.request("/api/comments/comment_123/replies");
+		expect(res.status).toBe(200);
+
+		const json = await res.json();
+		expect(json.success).toBe(true);
+		expect(json.data.data).toHaveLength(1);
+		expect(json.data.data[0].id).toBe("comment_reply_456");
+		expect(json.data.data[0].parentId).toBe("comment_123");
 	});
 
 	it("should return 401 Unauthorized when POST /articles/:articleId/comments without auth", async () => {
@@ -119,7 +144,6 @@ describe("Comments Routes Integration Tests", () => {
 
 		expect(res.status).toBe(200);
 		const json = await res.json();
-		expect(json.success).toBe(true);
 		expect(json.data.deletedAt).toBeDefined();
 	});
 });

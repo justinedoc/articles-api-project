@@ -5,6 +5,7 @@ import { createArticle, transitionArticle } from "@/modules/articles/service";
 import {
 	createComment,
 	deleteComment,
+	listCommentReplies,
 	listComments,
 	updateComment,
 } from "../service";
@@ -35,34 +36,51 @@ describe("Comment Service (PostgreSQL integration)", () => {
 		testUserIds.clear();
 	});
 
-	it("supports arbitrary nested replies and cursor listing", async () => {
-		const root = await createComment(articleId, commenterId, {
-			body: "Root",
+	it("supports paginating root comments with replyCount and loading replies on demand", async () => {
+		const root1 = await createComment(articleId, commenterId, {
+			body: "Root 1",
 		});
-		const reply = await createComment(articleId, authorId, {
-			body: "Reply",
-			parentId: root.id,
+		const root2 = await createComment(articleId, commenterId, {
+			body: "Root 2",
 		});
+
+		// Reply to root 1
+		const reply1 = await createComment(articleId, authorId, {
+			body: "Reply to Root 1",
+			parentId: root1.id,
+		});
+
+		// Reply to reply 1 (nested)
 		await createComment(articleId, commenterId, {
-			body: "Nested reply",
-			parentId: reply.id,
+			body: "Nested reply under Reply 1",
+			parentId: reply1.id,
 		});
 
-		const page = await listComments(articleId, undefined, 2);
-		expect(page.data).toHaveLength(2);
-		expect(page.nextCursor).toBeTruthy();
+		// 1. Root comments listing only returns root1 and root2
+		const roots = await listComments(articleId, undefined, 10);
+		expect(roots.data).toHaveLength(2);
+		expect(roots.data.map((c) => c.id)).toEqual([root1.id, root2.id]);
 
-		const nextPage = await listComments(
-			articleId,
-			page.nextCursor ?? undefined,
-			2,
+		const foundRoot1 = roots.data.find((c) => c.id === root1.id);
+		expect(foundRoot1?.replyCount).toBe(1);
+
+		const foundRoot2 = roots.data.find((c) => c.id === root2.id);
+		expect(foundRoot2?.replyCount).toBe(0);
+
+		// 2. Load direct replies for root1
+		const directReplies = await listCommentReplies(root1.id, undefined, 10);
+		expect(directReplies.data).toHaveLength(1);
+		expect(directReplies.data[0].id).toBe(reply1.id);
+		expect(directReplies.data[0].replyCount).toBe(1);
+
+		// 3. Load recursive tree for root1 (?tree=true)
+		const replyTree = await listCommentReplies(root1.id, undefined, 10, true);
+		expect(replyTree.data).toHaveLength(1);
+		expect(replyTree.data[0].id).toBe(reply1.id);
+		expect(replyTree.data[0].replies).toHaveLength(1);
+		expect(replyTree.data[0].replies?.[0].body).toBe(
+			"Nested reply under Reply 1",
 		);
-		expect(
-			new Set([...page.data, ...nextPage.data].map(({ id }) => id)).size,
-		).toBe(3);
-		expect(
-			nextPage.data.some(({ id }) => page.data.some((item) => item.id === id)),
-		).toBe(false);
 	});
 
 	it("soft-deletes comments and retains replies", async () => {
@@ -86,8 +104,13 @@ describe("Comment Service (PostgreSQL integration)", () => {
 		await expect(
 			updateComment(reply.id, authorId, "Edited"),
 		).resolves.toMatchObject({ body: "Edited" });
-		const listed = await listComments(articleId, undefined, 10);
-		expect(listed.data.map(({ id }) => id)).toEqual([root.id, reply.id]);
+
+		const roots = await listComments(articleId, undefined, 10);
+		expect(roots.data.map(({ id }) => id)).toEqual([root.id]);
+		expect(roots.data[0].replyCount).toBe(1);
+
+		const replies = await listCommentReplies(root.id, undefined, 10);
+		expect(replies.data.map(({ id }) => id)).toEqual([reply.id]);
 	});
 
 	it("rejects edits by non-owners", async () => {

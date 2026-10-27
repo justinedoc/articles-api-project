@@ -11,8 +11,11 @@ import {
 	articleCommentsParamSchema,
 	commentCreateSchema,
 	commentIdParamSchema,
+	commentItemSchema,
 	commentListQuerySchema,
+	commentRepliesQuerySchema,
 	commentSelectSchema,
+	commentTreeNodeSchema,
 } from "./schema";
 
 const tags = ["Comments"];
@@ -26,7 +29,9 @@ const commentResponse = (message: string) =>
 export const listCommentsRoute = createRoute({
 	method: "get",
 	path: "/articles/{articleId}/comments",
-	summary: "List comments for a published article",
+	summary: "List root comments for a published article",
+	description:
+		"Paginates only top-level discussion comments for an article, including the total reply count for each thread.",
 	tags,
 	request: {
 		params: articleCommentsParamSchema,
@@ -35,9 +40,31 @@ export const listCommentsRoute = createRoute({
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Comments retrieved successfully", true).extend({
-				data: cursorPaginationResultSchema(commentSelectSchema),
+				data: cursorPaginationResultSchema(commentItemSchema),
 			}),
-			"Comments for an article",
+			"Root comments for an article",
+		),
+		...defaultErrorResponses,
+	},
+});
+
+export const listCommentRepliesRoute = createRoute({
+	method: "get",
+	path: "/comments/{commentId}/replies",
+	summary: "List replies for a comment",
+	description:
+		"Loads direct replies for a comment on demand with pagination, or the full recursive reply tree when ?tree=true.",
+	tags,
+	request: {
+		params: commentIdParamSchema,
+		query: commentRepliesQuerySchema,
+	},
+	responses: {
+		[httpStatusCodes.OK]: jsonContent(
+			createMessageSchema("Replies retrieved successfully", true).extend({
+				data: cursorPaginationResultSchema(commentTreeNodeSchema),
+			}),
+			"Replies for a comment",
 		),
 		...defaultErrorResponses,
 	},
@@ -95,6 +122,7 @@ export const deleteCommentRoute = createRoute({
 });
 
 export type ListCommentsRoute = typeof listCommentsRoute;
+export type ListCommentRepliesRoute = typeof listCommentRepliesRoute;
 export type CreateCommentRoute = typeof createCommentRoute;
 export type UpdateCommentRoute = typeof updateCommentRoute;
 export type DeleteCommentRoute = typeof deleteCommentRoute;

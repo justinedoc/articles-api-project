@@ -5,12 +5,14 @@ import type { AppBindings, AppRouteHandler } from "@/core/types";
 import type {
 	CreateCommentRoute,
 	DeleteCommentRoute,
+	ListCommentRepliesRoute,
 	ListCommentsRoute,
 	UpdateCommentRoute,
 } from "./routes";
 import {
 	createComment,
 	deleteComment,
+	listCommentReplies,
 	listComments,
 	updateComment,
 } from "./service";
@@ -27,6 +29,23 @@ export const list: AppRouteHandler<ListCommentsRoute> = async (c) => {
 	const result = await listComments(articleId, cursor, limit);
 	return c.json(
 		{ success: true, message: "Comments retrieved successfully", data: result },
+		httpStatusCodes.OK,
+	);
+};
+
+export const listReplies: AppRouteHandler<ListCommentRepliesRoute> = async (
+	c,
+) => {
+	const { commentId } = c.req.valid("param");
+	const { cursor, limit, tree } = c.req.valid("query");
+	const result = await listCommentReplies(
+		commentId,
+		cursor,
+		limit,
+		tree === "true",
+	);
+	return c.json(
+		{ success: true, message: "Replies retrieved successfully", data: result },
 		httpStatusCodes.OK,
 	);
 };

@@ -78,23 +78,86 @@ describe("E2E: Comments & Discussion Threads", () => {
 		expect(replyRes.data.data.parentId).toBe(parentCommentId);
 		expect(replyRes.data.data.authorId).toBe(readerB.id);
 
-		// 3. Public retrieval of article comments
+		// 3. Public retrieval of root article comments (paginated root only)
 		const listRes = await apiClient.get<{
 			success: boolean;
 			data: {
-				data: Array<{ id: string; body: string; parentId: string | null }>;
+				data: Array<{
+					id: string;
+					body: string;
+					parentId: string | null;
+					replyCount: number;
+				}>;
 				nextCursor: string | null;
 			};
 		}>(`/api/v1/articles/${publishedArticleId}/comments`);
 
 		expect(listRes.status).toBe(200);
-		expect(listRes.data.data.data.length).toBeGreaterThanOrEqual(2);
-		expect(listRes.data.data.data.some((c) => c.id === parentCommentId)).toBe(
-			true,
+		// Should only return top-level comments
+		const rootComment = listRes.data.data.data.find(
+			(c) => c.id === parentCommentId,
 		);
+		expect(rootComment).toBeDefined();
+		expect(rootComment?.parentId).toBeNull();
+		expect(rootComment?.replyCount).toBe(1);
+		// The reply should NOT be in the root comments list
 		expect(
 			listRes.data.data.data.some((c) => c.id === replyRes.data.data.id),
-		).toBe(true);
+		).toBe(false);
+
+		// 4. On-demand retrieval of direct replies
+		const repliesRes = await apiClient.get<{
+			success: boolean;
+			data: {
+				data: Array<{
+					id: string;
+					body: string;
+					parentId: string | null;
+					replyCount: number;
+				}>;
+				nextCursor: string | null;
+			};
+		}>(`/api/v1/comments/${parentCommentId}/replies`);
+
+		expect(repliesRes.status).toBe(200);
+		expect(repliesRes.data.data.data.length).toBe(1);
+		expect(repliesRes.data.data.data[0].id).toBe(replyRes.data.data.id);
+		expect(repliesRes.data.data.data[0].parentId).toBe(parentCommentId);
+
+		// 5. Nested reply & Recursive tree retrieval (?tree=true)
+		const nestedReplyRes = await readerA.client.post<{
+			data: { id: string; parentId: string | null };
+		}>(`/api/v1/articles/${publishedArticleId}/comments`, {
+			body: "Replying to Reader B's reply!",
+			parentId: replyRes.data.data.id,
+		});
+		expect(nestedReplyRes.status).toBe(201);
+
+		const treeRes = await apiClient.get<{
+			success: boolean;
+			data: {
+				data: Array<{
+					id: string;
+					body: string;
+					parentId: string | null;
+					replies: Array<{
+						id: string;
+						body: string;
+						parentId: string | null;
+						replies: unknown[];
+					}>;
+				}>;
+				nextCursor: string | null;
+			};
+		}>(`/api/v1/comments/${parentCommentId}/replies?tree=true`);
+
+		expect(treeRes.status).toBe(200);
+		expect(treeRes.data.data.data.length).toBe(1);
+		expect(treeRes.data.data.data[0].id).toBe(replyRes.data.data.id);
+		expect(treeRes.data.data.data[0].replies.length).toBe(1);
+		expect(treeRes.data.data.data[0].replies[0].id).toBe(
+			nestedReplyRes.data.data.id,
+		);
 	});
 
 	it("should allow comment author to update body, rejecting non-authors with 403", async () => {

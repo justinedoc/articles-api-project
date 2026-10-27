@@ -1,6 +1,6 @@
+import { z } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent } from "stoker/openapi/helpers";
-import { z } from "zod";
 import { createMessageSchema } from "@/core/openapi/schemas";
 import { cursorPaginationQuerySchema } from "@/core/pagination";
 
@@ -39,7 +39,7 @@ export const defaultErrorResponses = {
 
 export { cursorPaginationQuerySchema };
 
-export const cursorPaginationResultSchema = <T extends z.core.$ZodObject>(
+export const cursorPaginationResultSchema = <T extends z.ZodTypeAny>(
 	schema: T,
 ) =>
 	z.object({
