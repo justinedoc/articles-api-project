@@ -31,3 +31,29 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
 	c.var?.logger?.info({ userId: user.id }, "User accessed protected route");
 	await next();
 });
+
+export const optionalAuthMiddleware = createMiddleware<AppBindings>(
+	async (c, next) => {
+		let user = c.get("user");
+		let session = c.get("session");
+
+		if (!session || !user) {
+			try {
+				const authResult = await auth.api.getSession({
+					headers: c.req.raw.headers,
+				});
+
+				if (authResult) {
+					user = authResult.user;
+					session = authResult.session;
+					c.set("user", user);
+					c.set("session", session);
+				}
+			} catch {
+				// Proceed unauthenticated if session resolution fails
+			}
+		}
+
+		await next();
+	},
+);

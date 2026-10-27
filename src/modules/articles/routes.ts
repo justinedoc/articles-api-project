@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { jsonContent, jsonContentRequired } from "stoker/openapi/helpers";
-import { authMiddleware } from "@/core/auth/middleware";
+import { authMiddleware, optionalAuthMiddleware } from "@/core/auth/middleware";
 import {
 	cursorPaginationResultSchema,
 	defaultErrorResponses,
@@ -11,7 +11,7 @@ import {
 	articleCreateSchema,
 	articleIdParamSchema,
 	articleListQuerySchema,
-	articleSelectSchema,
+	articleResponseSchema,
 	articleUpdateSchema,
 	ownArticlesQuerySchema,
 	trendingArticleSchema,
@@ -22,7 +22,7 @@ const tags = ["Articles"];
 const security = [{ BearerAuth: [] }];
 const articleResponse = (message: string) =>
 	jsonContent(
-		createMessageSchema(message, true).extend({ data: articleSelectSchema }),
+		createMessageSchema(message, true).extend({ data: articleResponseSchema }),
 		message,
 	);
 const likeResponse = (message: string) =>
@@ -54,11 +54,12 @@ export const listPublicArticlesRoute = createRoute({
 	path: "/",
 	summary: "List published articles",
 	tags,
+	middleware: [optionalAuthMiddleware],
 	request: { query: articleListQuerySchema },
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Articles retrieved successfully", true).extend({
-				data: cursorPaginationResultSchema(articleSelectSchema),
+				data: cursorPaginationResultSchema(articleResponseSchema),
 			}),
 			"Articles retrieved successfully",
 		),
@@ -71,6 +72,7 @@ export const getTrendingArticlesRoute = createRoute({
 	path: "/trending",
 	summary: "List trending published articles",
 	tags,
+	middleware: [optionalAuthMiddleware],
 	request: { query: trendingArticlesQuerySchema },
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
@@ -98,7 +100,7 @@ export const listOwnedArticlesRoute = createRoute({
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Owned articles retrieved successfully", true).extend(
 				{
-					data: cursorPaginationResultSchema(articleSelectSchema),
+					data: cursorPaginationResultSchema(articleResponseSchema),
 				},
 			),
 			"Owned articles retrieved successfully",
@@ -112,6 +114,7 @@ export const getPublicArticleRoute = createRoute({
 	path: "/{id}",
 	summary: "Get a published article",
 	tags,
+	middleware: [optionalAuthMiddleware],
 	request: { params: articleIdParamSchema },
 	responses: {
 		[httpStatusCodes.OK]: articleResponse("Article retrieved successfully"),

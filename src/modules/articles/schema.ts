@@ -76,21 +76,68 @@ export const articleListQuerySchema = cursorPaginationQuerySchema.extend({
 			},
 			description: "Full-text search query matching article title and content",
 		}),
+	author: z
+		.string()
+		.trim()
+		.min(1)
+		.max(50)
+		.optional()
+		.openapi({
+			param: {
+				name: "author",
+				in: "query",
+			},
+			description: "Filter articles by author username",
+			example: "johndoe",
+		}),
 });
 
-export const trendingArticleSchema = articleSelectSchema.extend({
+export const articleAuthorSchema = z.object({
+	id: z.string().openapi({
+		description: "Author user identifier",
+		example: "usr_123",
+	}),
+	username: z.string().openapi({
+		description: "Author unique handle",
+		example: "johndoe",
+	}),
+	displayName: z.string().openapi({
+		description: "Author public display name",
+		example: "John Doe",
+	}),
+	avatarUrl: z.string().nullable().openapi({
+		description: "Author avatar URL",
+		example: "https://example.com/avatar.png",
+	}),
+});
+
+export const articleResponseSchema = articleSelectSchema.extend({
+	tags: z.array(z.string()).openapi({
+		description: "List of topic tags in alphabetical order",
+		example: ["architecture", "typescript"],
+	}),
+	likeCount: z.number().int().openapi({
+		description: "Total likes for this article",
+		example: 18,
+	}),
+	commentCount: z.number().int().openapi({
+		description: "Total non-deleted comments for this article",
+		example: 6,
+	}),
+	author: articleAuthorSchema.openapi({
+		description: "Author profile summary",
+	}),
+	isLiked: z.boolean().openapi({
+		description: "Whether the requesting user has liked this article",
+		example: false,
+	}),
+});
+
+export const trendingArticleSchema = articleResponseSchema.extend({
 	engagementScore: z.number().openapi({
 		description:
 			"Composite engagement score based on recent likes and comments",
 		example: 42,
-	}),
-	likeCount: z.number().openapi({
-		description: "Total likes for this article",
-		example: 18,
-	}),
-	commentCount: z.number().openapi({
-		description: "Total comments for this article",
-		example: 6,
 	}),
 });
 
@@ -145,6 +192,8 @@ export const ownArticlesQuerySchema = cursorPaginationQuerySchema.extend({
 
 export type ArticleCreatePayload = z.infer<typeof articleCreateSchema>;
 export type ArticleUpdatePayload = z.infer<typeof articleUpdateSchema>;
+export type ArticleAuthor = z.infer<typeof articleAuthorSchema>;
+export type ArticleResponse = z.infer<typeof articleResponseSchema>;
 export type SelectArticle = z.infer<typeof articleSelectSchema>;
 export type TrendingArticle = z.infer<typeof trendingArticleSchema>;
 export type TrendingArticlesQuery = z.infer<typeof trendingArticlesQuerySchema>;

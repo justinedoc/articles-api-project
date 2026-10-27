@@ -13,7 +13,7 @@ export const pool =
 	globalForDb.pool ??
 	new Pool({
 		connectionString: env.DATABASE_URL,
-		max: 10,
+		max: 20,
 		idleTimeoutMillis: 60_000,
 		connectionTimeoutMillis: 10_000,
 	});
