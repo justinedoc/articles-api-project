@@ -17,6 +17,9 @@ const assertPublishedArticle = async (articleId: string) => {
 	}
 };
 
+/**
+ * lists paginated comments for a published article.
+ */
 export const listComments = async (
 	articleId: string,
 	cursor: string | undefined,
@@ -51,6 +54,9 @@ export const listComments = async (
 	};
 };
 
+/**
+ * creates a comment or reply under a published article.
+ */
 export const createComment = async (
 	articleId: string,
 	authorId: string,
@@ -100,6 +106,9 @@ const getCommentOrThrow = async (commentId: string) => {
 	return record;
 };
 
+/**
+ * updates the body of an authored comment.
+ */
 export const updateComment = async (
 	commentId: string,
 	authorId: string,
@@ -126,6 +135,9 @@ export const updateComment = async (
 	return updated;
 };
 
+/**
+ * soft-deletes an authored comment.
+ */
 export const deleteComment = async (commentId: string, authorId: string) => {
 	const current = await getCommentOrThrow(commentId);
 	if (current.authorId !== authorId) {

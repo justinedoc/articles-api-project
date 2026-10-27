@@ -2,6 +2,9 @@ import { sql } from "drizzle-orm";
 import { db } from "@/core/db";
 import { isRedisAvailable, redis } from "@/core/redis";
 
+/**
+ * checks database and redis connectivity for health checks.
+ */
 export const getSystemHealth = async () => {
 	let database: "up" | "down" = "down";
 	let redisStatus: "up" | "down" = "down";

@@ -19,7 +19,7 @@ export const getProfileUsernameCacheKey = (username: string) =>
 	`profiles:username:${username.toLowerCase()}`;
 
 /**
- * Generates a unique username derived from an email or base string.
+ * generates a unique username derived from an email or base string.
  */
 export async function generateUniqueUsername(
 	baseString: string,
@@ -37,8 +37,7 @@ export async function generateUniqueUsername(
 }
 
 /**
- * Retrieves the author profile for a given user by their user ID.
- * Pure query - reads composite profile (joined with user table) and caches in Redis.
+ * retrieves the author profile for a given user by their user ID.
  */
 export const getProfileByUserId = async (
 	userId: string,
@@ -78,8 +77,7 @@ export const getProfileByUserId = async (
 };
 
 /**
- * Creates an author profile for a user.
- * Explicit write command - derives handle, inserts profile record, and primes caches.
+ * creates an author profile for a user.
  */
 export const createProfile = async (
 	userId: string,
@@ -146,8 +144,7 @@ export const createProfile = async (
 };
 
 /**
- * Gets author profile, or initializes it if not yet created.
- * Acts as a resilient fallback facade for authenticated user profile retrieval.
+ * gets author profile, or initializes it if not yet created.
  */
 export const getOrCreateProfile = async (
 	userId: string,
@@ -161,8 +158,7 @@ export const getOrCreateProfile = async (
 };
 
 /**
- * Retrieves a public author profile by unique username.
- * Cached
+ * retrieves a public author profile by unique username.
  */
 export const getPublicProfileByUsername = async (
 	username: string,
@@ -206,7 +202,7 @@ export const getPublicProfileByUsername = async (
 };
 
 /**
- * Updates the author's profile.
+ * updates the author's profile.
  */
 export const updateProfile = async (
 	userId: string,
@@ -228,6 +224,7 @@ export const updateProfile = async (
 		username: rawUsername,
 		...authorMetadata
 	} = payload;
+
 	const userUpdates: { name?: string; image?: string | null } = {};
 	if (displayName !== undefined) {
 		userUpdates.name = displayName;

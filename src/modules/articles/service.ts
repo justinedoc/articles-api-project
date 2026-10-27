@@ -93,6 +93,9 @@ const getLikeResult = async (articleId: string, userId: string) => {
 	return { count: Number(result?.count ?? 0), liked: Boolean(result?.liked) };
 };
 
+/**
+ * creates a new draft article and associates any provided tags.
+ */
 export const createArticle = async (
 	authorId: string,
 	payload: ArticleCreatePayload,
@@ -130,6 +133,9 @@ export const createArticle = async (
 	return created;
 };
 
+/**
+ * retrieves a published article by id, using redis cache.
+ */
 export const getPublicArticle = async (id: string): Promise<SelectArticle> => {
 	const record = await cache.getOrSet(
 		getArticleCacheKey(id),
@@ -149,6 +155,9 @@ export const getPublicArticle = async (id: string): Promise<SelectArticle> => {
 	return record;
 };
 
+/**
+ * adds a like to a published article for the user.
+ */
 export const likeArticle = async (articleId: string, userId: string) => {
 	await assertPublished(articleId);
 	await db
@@ -158,6 +167,9 @@ export const likeArticle = async (articleId: string, userId: string) => {
 	return getLikeResult(articleId, userId);
 };
 
+/**
+ * removes a like from a published article for the user.
+ */
 export const unlikeArticle = async (articleId: string, userId: string) => {
 	await assertPublished(articleId);
 	await db
@@ -168,6 +180,9 @@ export const unlikeArticle = async (articleId: string, userId: string) => {
 	return getLikeResult(articleId, userId);
 };
 
+/**
+ * lists published articles with optional tag filtering, search, and cursor pagination.
+ */
 export const listPublicArticles = async (
 	cursor: string | undefined,
 	limit: number,
@@ -232,6 +247,9 @@ export const listPublicArticles = async (
 	};
 };
 
+/**
+ * retrieves an article verifying the requesting user is the author.
+ */
 export const getOwnedArticle = async (
 	id: string,
 	userId: string,
@@ -241,6 +259,9 @@ export const getOwnedArticle = async (
 	return record;
 };
 
+/**
+ * updates an owned article and syncs its tags and cache.
+ */
 export const updateArticle = async (
 	id: string,
 	userId: string,
@@ -298,6 +319,9 @@ export const updateArticle = async (
 
 type ArticleTransition = "published" | "archived";
 
+/**
+ * transitions article status between draft, published, and archived.
+ */
 export const transitionArticle = async (
 	id: string,
 	userId: string,
@@ -337,6 +361,9 @@ export const transitionArticle = async (
 	return updated;
 };
 
+/**
+ * deletes an owned article and invalidates its cache.
+ */
 export const deleteArticle = async (id: string, userId: string) => {
 	const current = await getArticleOrThrow(id);
 	assertOwner(current, userId);

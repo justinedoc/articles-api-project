@@ -12,6 +12,9 @@ import {
 
 export const getAccountCacheKey = (userId: string) => `account:user:${userId}`;
 
+/**
+ * retrieves the authenticated user's account details.
+ */
 export const getAccount = async (userId: string) => {
 	const accountData = await cache.getOrSet(
 		getAccountCacheKey(userId),
@@ -34,6 +37,9 @@ export const getAccount = async (userId: string) => {
 	return accountData;
 };
 
+/**
+ * deletes a user account and cascades cache invalidation across profiles and articles.
+ */
 export const deleteAccount = async (userId: string) => {
 	const { userProfile, userArticles, deleted } = await db.transaction(
 		async (tx) => {
