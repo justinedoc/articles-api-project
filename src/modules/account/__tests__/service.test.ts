@@ -65,7 +65,6 @@ describe("Account Service", () => {
 				id: `prof-${crypto.randomUUID()}`,
 				userId: created.id,
 				username: `user_${created.id.slice(-6)}`,
-				displayName: "Delete Test User",
 			});
 
 			const result = await deleteAccount(created.id);

@@ -59,6 +59,7 @@ describe("Profiles Service", () => {
 
 			const selectMock = {
 				from: vi.fn().mockReturnThis(),
+				innerJoin: vi.fn().mockReturnThis(),
 				where: vi.fn().mockResolvedValue([mockProfile]),
 			};
 			vi.mocked(db.select).mockReturnValue(
@@ -109,6 +110,7 @@ describe("Profiles Service", () => {
 				if (selectCall === 1) {
 					return {
 						from: vi.fn().mockReturnThis(),
+						innerJoin: vi.fn().mockReturnThis(),
 						where: vi.fn().mockResolvedValue([]),
 					} as unknown as ReturnType<typeof db.select>;
 				}
@@ -167,6 +169,7 @@ describe("Profiles Service", () => {
 
 			const selectMock = {
 				from: vi.fn().mockReturnThis(),
+				innerJoin: vi.fn().mockReturnThis(),
 				where: vi.fn().mockResolvedValue([mockPublicProfile]),
 			};
 			vi.mocked(db.select).mockReturnValue(
@@ -248,7 +251,14 @@ describe("Profiles Service", () => {
 
 			const userUpdateMock = {
 				set: vi.fn().mockReturnThis(),
-				where: vi.fn().mockResolvedValue([{ id: "usr_1" }]),
+				where: vi.fn().mockReturnThis(),
+				returning: vi.fn().mockResolvedValue([
+					{
+						id: "usr_1",
+						name: "Alice Smith",
+						image: "https://example.com/new.jpg",
+					},
+				]),
 			};
 			const profileUpdateMock = {
 				set: vi.fn().mockReturnThis(),

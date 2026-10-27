@@ -47,8 +47,21 @@ export const getOrCreateProfile = async (
 		getProfileUserCacheKey(userId),
 		async () => {
 			const [existingProfile] = await db
-				.select()
+				.select({
+					id: profile.id,
+					userId: profile.userId,
+					username: profile.username,
+					displayName: user.name,
+					bio: profile.bio,
+					avatarUrl: user.image,
+					bannerUrl: profile.bannerUrl,
+					websiteUrl: profile.websiteUrl,
+					socialLinks: profile.socialLinks,
+					createdAt: profile.createdAt,
+					updatedAt: profile.updatedAt,
+				})
 				.from(profile)
+				.innerJoin(user, eq(user.id, profile.userId))
 				.where(eq(profile.userId, userId));
 
 			if (existingProfile) {
@@ -80,20 +93,37 @@ export const getOrCreateProfile = async (
 						id: generateId(),
 						userId,
 						username,
-						displayName: userData.name,
-						avatarUrl: userData.image,
 						socialLinks: {},
 					})
 					.onConflictDoNothing()
 					.returning();
 
-				if (newProfile) return newProfile;
+				if (newProfile) {
+					return {
+						...newProfile,
+						displayName: userData.name,
+						avatarUrl: userData.image,
+					};
+				}
 
-				const [existingProfile] = await db
-					.select()
+				const [existing] = await db
+					.select({
+						id: profile.id,
+						userId: profile.userId,
+						username: profile.username,
+						displayName: user.name,
+						bio: profile.bio,
+						avatarUrl: user.image,
+						bannerUrl: profile.bannerUrl,
+						websiteUrl: profile.websiteUrl,
+						socialLinks: profile.socialLinks,
+						createdAt: profile.createdAt,
+						updatedAt: profile.updatedAt,
+					})
 					.from(profile)
+					.innerJoin(user, eq(user.id, profile.userId))
 					.where(eq(profile.userId, userId));
-				if (existingProfile) return existingProfile;
+				if (existing) return existing;
 			}
 
 			return null;
@@ -115,6 +145,7 @@ export const getOrCreateProfile = async (
 
 /**
  * Retrieves a public author profile by unique username.
+ * Reads personal identity from the joined user record.
  * Cached in Redis for fast access.
  */
 export const getPublicProfileByUsername = async (
@@ -129,15 +160,16 @@ export const getPublicProfileByUsername = async (
 				.select({
 					id: profile.id,
 					username: profile.username,
-					displayName: profile.displayName,
+					displayName: user.name,
 					bio: profile.bio,
-					avatarUrl: profile.avatarUrl,
+					avatarUrl: user.image,
 					bannerUrl: profile.bannerUrl,
 					websiteUrl: profile.websiteUrl,
 					socialLinks: profile.socialLinks,
 					createdAt: profile.createdAt,
 				})
 				.from(profile)
+				.innerJoin(user, eq(user.id, profile.userId))
 				.where(eq(profile.username, normalizedUsername));
 
 			return record ?? null;
@@ -159,8 +191,8 @@ export const getPublicProfileByUsername = async (
 
 /**
  * Updates the author's profile.
- * Automatically synchronizes displayName -> user.name and avatarUrl -> user.image
- * to ensure Better-Auth sessions and profile data remain completely in sync.
+ * Updates displayName (user.name) and avatarUrl (user.image) directly in the user record,
+ * while author metadata is updated in the profile record.
  */
 export const updateProfile = async (
 	userId: string,
@@ -176,31 +208,37 @@ export const updateProfile = async (
 	// Ensure profile exists first
 	const currentProfile = await getOrCreateProfile(userId);
 
+	const {
+		displayName,
+		avatarUrl,
+		username: rawUsername,
+		...authorMetadata
+	} = payload;
 	const userUpdates: { name?: string; image?: string | null } = {};
-	if (payload.displayName !== undefined) {
-		userUpdates.name = payload.displayName;
+	if (displayName !== undefined) {
+		userUpdates.name = displayName;
 	}
-	if (payload.avatarUrl !== undefined) {
-		userUpdates.image = payload.avatarUrl;
+	if (avatarUrl !== undefined) {
+		userUpdates.image = avatarUrl;
 	}
 
 	const profileUpdates = {
-		...payload,
-		...(payload.username ? { username: payload.username.toLowerCase() } : {}),
+		...authorMetadata,
+		...(rawUsername ? { username: rawUsername.toLowerCase() } : {}),
 	};
 
 	try {
 		const updated = await db.transaction(async (tx) => {
 			if (
-				payload.username &&
-				payload.username.toLowerCase() !== currentProfile.username.toLowerCase()
+				rawUsername &&
+				rawUsername.toLowerCase() !== currentProfile.username.toLowerCase()
 			) {
 				const [collision] = await tx
 					.select({ id: profile.id })
 					.from(profile)
 					.where(
 						and(
-							eq(profile.username, payload.username.toLowerCase()),
+							eq(profile.username, rawUsername.toLowerCase()),
 							ne(profile.userId, userId),
 						),
 					);
@@ -213,17 +251,44 @@ export const updateProfile = async (
 				}
 			}
 
+			let updatedUserName = currentProfile.displayName;
+			let updatedUserImage = currentProfile.avatarUrl;
+
 			if (Object.keys(userUpdates).length > 0) {
-				await tx.update(user).set(userUpdates).where(eq(user.id, userId));
+				const [updatedUser] = await tx
+					.update(user)
+					.set(userUpdates)
+					.where(eq(user.id, userId))
+					.returning();
+				if (updatedUser) {
+					updatedUserName = updatedUser.name;
+					updatedUserImage = updatedUser.image;
+				}
 			}
 
-			const [updatedProfile] = await tx
-				.update(profile)
-				.set(profileUpdates)
-				.where(eq(profile.userId, userId))
-				.returning();
+			let updatedProfileRecord = currentProfile;
+			if (Object.keys(profileUpdates).length > 0) {
+				const [p] = await tx
+					.update(profile)
+					.set(profileUpdates)
+					.where(eq(profile.userId, userId))
+					.returning();
+				if (p) {
+					updatedProfileRecord = {
+						...p,
+						displayName: updatedUserName,
+						avatarUrl: updatedUserImage,
+					};
+				}
+			} else {
+				updatedProfileRecord = {
+					...currentProfile,
+					displayName: updatedUserName,
+					avatarUrl: updatedUserImage,
+				};
+			}
 
-			return updatedProfile;
+			return updatedProfileRecord;
 		});
 
 		if (!updated) {

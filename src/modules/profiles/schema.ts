@@ -6,7 +6,10 @@ const { createSelectSchema } = createSchemaFactory({
 	zodInstance: z,
 });
 
-export const selectProfileSchema = createSelectSchema(profile);
+export const selectProfileSchema = createSelectSchema(profile).extend({
+	displayName: z.string(),
+	avatarUrl: z.string().nullable(),
+});
 
 export const publicProfileSchema = z.object({
 	id: z.string(),

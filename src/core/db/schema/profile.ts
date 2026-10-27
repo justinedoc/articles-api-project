@@ -8,9 +8,7 @@ export const profile = pgTable("profile", {
 		.unique()
 		.references(() => user.id, { onDelete: "cascade" }),
 	username: text("username").notNull().unique(),
-	displayName: text("display_name").notNull(),
 	bio: text("bio"),
-	avatarUrl: text("avatar_url"),
 	bannerUrl: text("banner_url"),
 	websiteUrl: text("website_url"),
 	socialLinks: jsonb("social_links")
