@@ -86,7 +86,7 @@ describe("Articles Routes Integration Tests", () => {
 
 	it("should return 200 OK with paginated articles on GET /articles", async () => {
 		vi.spyOn(articleService, "listPublicArticles").mockResolvedValue({
-			data: [mockArticle],
+			articles: [mockArticle],
 			nextCursor: null,
 		});
 
@@ -217,7 +217,7 @@ describe("Articles Routes Integration Tests", () => {
 		const session = createMockSession({ id: "usr_123" });
 		vi.spyOn(auth.api, "getSession").mockResolvedValue(session);
 		vi.spyOn(articleService, "listOwnedArticles").mockResolvedValue({
-			data: [mockArticle],
+			articles: [mockArticle],
 			nextCursor: null,
 		});
 

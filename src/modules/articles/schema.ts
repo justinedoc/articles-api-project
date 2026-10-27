@@ -70,7 +70,6 @@ export const articleListQuerySchema = cursorPaginationQuerySchema.extend({
 				in: "query",
 			},
 			description: "Filter articles by tag name",
-			example: "typescript",
 		}),
 	search: z
 		.string()
@@ -97,7 +96,6 @@ export const articleListQuerySchema = cursorPaginationQuerySchema.extend({
 				in: "query",
 			},
 			description: "Filter articles by author username",
-			example: "johndoe",
 		}),
 });
 
@@ -168,7 +166,6 @@ export const ownArticlesQuerySchema = cursorPaginationQuerySchema.extend({
 			},
 			description:
 				"Filter own articles by status (draft, published, or archived)",
-			example: "draft",
 		}),
 	tag: z
 		.string()
@@ -182,7 +179,6 @@ export const ownArticlesQuerySchema = cursorPaginationQuerySchema.extend({
 				in: "query",
 			},
 			description: "Filter own articles by tag name",
-			example: "typescript",
 		}),
 	search: z
 		.string()

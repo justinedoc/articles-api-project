@@ -510,7 +510,7 @@ export const listPublicArticles = async (
 	const last = data[data.length - 1];
 
 	return {
-		data,
+		articles: data,
 		nextCursor:
 			hasNextPage && last
 				? encodeCursor({
@@ -580,7 +580,7 @@ export const listOwnedArticles = async (
 	const last = data[data.length - 1];
 
 	return {
-		data,
+		articles: data,
 		nextCursor:
 			hasNextPage && last
 				? encodeCursor({
