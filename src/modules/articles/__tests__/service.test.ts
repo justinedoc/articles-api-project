@@ -6,6 +6,7 @@ import {
 	articleLike,
 	articleTag,
 	comment,
+	profile,
 	tag,
 } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
@@ -14,6 +15,7 @@ import {
 	createArticle,
 	deleteArticle,
 	getArticleLikesCount,
+	getPublicArticle,
 	getTrendingArticles,
 	likeArticle,
 	listOwnedArticles,
@@ -131,7 +133,7 @@ describe("Article Service (PostgreSQL integration)", () => {
 		expect(filtered.nextCursor).toBeNull();
 		expect(draft.status).toBe("draft");
 
-		const page = await listPublicArticles(undefined, 1);
+		const page = await listPublicArticles(undefined, 1, "backend");
 		expect(page.data).toHaveLength(1);
 		expect(page.nextCursor).toBeNull();
 	});
@@ -294,5 +296,71 @@ describe("Article Service (PostgreSQL integration)", () => {
 		);
 		expect(page2.data.length).toBe(1);
 		expect(page2.data[0].id).not.toBe(page1.data[0].id);
+	});
+
+	it("enriches articles with alphabetical tags, metrics, author profile, and viewer like state", async () => {
+		const viewer = await createUser("viewer");
+		await db.insert(profile).values({
+			id: `profile-${crypto.randomUUID()}`,
+			userId,
+			username: "author_jane",
+		});
+
+		const created = await createArticle(userId, {
+			title: "Enriched Article",
+			body: "Full body content",
+			tags: ["typescript", "backend", "architecture"],
+		});
+
+		// Tags should be sorted alphabetically
+		expect(created.tags).toEqual(["architecture", "backend", "typescript"]);
+		expect(created.likeCount).toBe(0);
+		expect(created.commentCount).toBe(0);
+		expect(created.author.username).toBe("author_jane");
+		expect(created.isLiked).toBe(false);
+
+		await transitionArticle(created.id, userId, "published");
+
+		// Anonymous viewer
+		const anonPublic = await getPublicArticle(created.id);
+		expect(anonPublic.isLiked).toBe(false);
+		expect(anonPublic.likeCount).toBe(0);
+		expect(anonPublic.author.username).toBe("author_jane");
+
+		// Viewer likes article
+		await likeArticle(created.id, viewer.id);
+
+		// Authenticated viewer sees isLiked: true
+		const viewerPublic = await getPublicArticle(created.id, viewer.id);
+		expect(viewerPublic.likeCount).toBe(1);
+		expect(viewerPublic.isLiked).toBe(true);
+
+		// Anonymous still sees isLiked: false but updated likeCount
+		const anonAfterLike = await getPublicArticle(created.id);
+		expect(anonAfterLike.likeCount).toBe(1);
+		expect(anonAfterLike.isLiked).toBe(false);
+
+		// Filter public articles by author username
+		const byAuthor = await listPublicArticles(
+			undefined,
+			10,
+			undefined,
+			undefined,
+			"author_jane",
+			viewer.id,
+		);
+		expect(byAuthor.data.some((a) => a.id === created.id)).toBe(true);
+		const found = byAuthor.data.find((a) => a.id === created.id);
+		expect(found?.isLiked).toBe(true);
+
+		// Filter by non-existent author
+		const byUnknown = await listPublicArticles(
+			undefined,
+			10,
+			undefined,
+			undefined,
+			"nonexistent_user",
+		);
+		expect(byUnknown.data.length).toBe(0);
 	});
 });

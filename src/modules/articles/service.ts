@@ -1,4 +1,15 @@
-import { and, count, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import {
+	and,
+	count,
+	desc,
+	eq,
+	gt,
+	inArray,
+	isNull,
+	lt,
+	or,
+	sql,
+} from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { cache } from "@/core/cache";
 import { db } from "@/core/db";
@@ -7,15 +18,18 @@ import {
 	articleLike,
 	articleTag,
 	comment,
+	profile,
 	tag,
+	user,
 } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
 import { decodeCursor, encodeCursor } from "@/core/pagination";
 import { generateId } from "@/core/utils";
 import type {
+	ArticleAuthor,
 	ArticleCreatePayload,
+	ArticleResponse,
 	ArticleUpdatePayload,
-	SelectArticle,
 	TrendingArticle,
 } from "./schema";
 
@@ -66,6 +80,70 @@ const syncArticleTags = async (
 	);
 };
 
+const tagsSubquerySql = sql<string[]>`COALESCE(
+	(SELECT json_agg(t.name ORDER BY t.name ASC)
+	 FROM "article_tag" at_sub
+	 JOIN "tag" t ON t.id = at_sub.tag_id
+	 WHERE at_sub.article_id = "article"."id"
+	),
+	'[]'::json
+)`;
+
+const likeCountSubquerySql = sql<number>`COALESCE(
+	(SELECT COUNT(*)::int
+	 FROM "article_like" al
+	 WHERE al.article_id = "article"."id"
+	),
+	0
+)`;
+
+const commentCountSubquerySql = sql<number>`COALESCE(
+	(SELECT COUNT(*)::int
+	 FROM "comment" c
+	 WHERE c.article_id = "article"."id" AND c.deleted_at IS NULL
+	),
+	0
+)`;
+
+const authorSubquerySql = sql<ArticleAuthor>`COALESCE(
+	(SELECT json_build_object(
+	   'id', COALESCE(u.id, "article"."author_id"),
+	   'username', COALESCE(p.username, u.name, "article"."author_id"),
+	   'displayName', COALESCE(u.name, 'Unknown Author'),
+	   'avatarUrl', u.image
+	 )
+	 FROM "user" u
+	 LEFT JOIN "profile" p ON p.user_id = u.id
+	 WHERE u.id = "article"."author_id"
+	),
+	json_build_object(
+	  'id', "article"."author_id",
+	  'username', "article"."author_id",
+	  'displayName', 'Unknown Author',
+	  'avatarUrl', null
+	)
+)`;
+
+export const buildArticleSelect = (viewerId?: string) => ({
+	id: article.id,
+	authorId: article.authorId,
+	title: article.title,
+	slug: article.slug,
+	excerpt: article.excerpt,
+	body: article.body,
+	status: article.status,
+	publishedAt: article.publishedAt,
+	createdAt: article.createdAt,
+	updatedAt: article.updatedAt,
+	tags: tagsSubquerySql,
+	likeCount: likeCountSubquerySql,
+	commentCount: commentCountSubquerySql,
+	author: authorSubquerySql,
+	isLiked: viewerId
+		? sql<boolean>`EXISTS (SELECT 1 FROM "article_like" al WHERE al.article_id = "article"."id" AND al.user_id = ${viewerId})`
+		: sql<boolean>`false`,
+});
+
 const getArticleOrThrow = async (id: string) => {
 	const [record] = await db.select().from(article).where(eq(article.id, id));
 	if (!record) {
@@ -74,7 +152,7 @@ const getArticleOrThrow = async (id: string) => {
 	return record;
 };
 
-const assertOwner = (record: SelectArticle, userId: string) => {
+const assertOwner = (record: { authorId: string }, userId: string) => {
 	if (record.authorId !== userId) {
 		throw new AppError(
 			"You do not own this article",
@@ -135,13 +213,24 @@ const getLikeResult = async (articleId: string, userId: string) => {
 	return { count: totalCount, liked: userLike.length > 0 };
 };
 
+const getArticleById = async (
+	id: string,
+	viewerId?: string,
+): Promise<ArticleResponse | null> => {
+	const [record] = await db
+		.select(buildArticleSelect(viewerId))
+		.from(article)
+		.where(eq(article.id, id));
+	return record ?? null;
+};
+
 /**
- * creates a new draft article and associates any provided tags.
+ * creates a new draft article, associates tags, and returns the enriched article.
  */
 export const createArticle = async (
 	authorId: string,
 	payload: ArticleCreatePayload,
-): Promise<SelectArticle> => {
+): Promise<ArticleResponse> => {
 	const id = generateId();
 	const values = {
 		id,
@@ -154,21 +243,16 @@ export const createArticle = async (
 		publishedAt: null,
 	};
 	const names = normalizeTags(payload.tags);
-	const [created] =
-		names.length > 0
-			? [
-					await db.transaction(async (transaction) => {
-						const [record] = await transaction
-							.insert(article)
-							.values(values)
-							.returning();
-						if (!record) throw new AppError("Article could not be created");
-						await syncArticleTags(transaction, id, names);
-						return record;
-					}),
-				]
-			: await db.insert(article).values(values).returning();
+	if (names.length > 0) {
+		await db.transaction(async (transaction) => {
+			await transaction.insert(article).values(values);
+			await syncArticleTags(transaction, id, names);
+		});
+	} else {
+		await db.insert(article).values(values);
+	}
 
+	const created = await getArticleById(id, authorId);
 	if (!created) {
 		throw new AppError("Article could not be created");
 	}
@@ -176,33 +260,51 @@ export const createArticle = async (
 };
 
 /**
- * retrieves a published article by id, using redis cache.
+ * retrieves a published article by id, using redis cache with viewer-specific like resolution.
  */
-export const getPublicArticle = async (id: string): Promise<SelectArticle> => {
-	const record = await cache.getOrSet(
+export const getPublicArticle = async (
+	id: string,
+	viewerId?: string,
+): Promise<ArticleResponse> => {
+	const baseArticle = await cache.getOrSet(
 		getArticleCacheKey(id),
 		async () => {
-			const [published] = await db
-				.select()
+			const [record] = await db
+				.select(buildArticleSelect())
 				.from(article)
 				.where(and(eq(article.id, id), eq(article.status, "published")));
-			return published ?? null;
+			return record ?? null;
 		},
 		{ ttlSeconds: 300, jitter: true, cacheNull: true, nullTtlSeconds: 30 },
 	);
 
-	if (!record) {
+	if (!baseArticle) {
 		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
 	}
-	return record;
+
+	if (!viewerId) {
+		return baseArticle;
+	}
+
+	const [userLike] = await db
+		.select({ userId: articleLike.userId })
+		.from(articleLike)
+		.where(and(eq(articleLike.articleId, id), eq(articleLike.userId, viewerId)))
+		.limit(1);
+
+	return {
+		...baseArticle,
+		isLiked: Boolean(userLike),
+	};
 };
 
 /**
  * retrieves curated trending articles based on engagement in the last 30 days.
- * cached in redis with single-flight mutex protection.
+ * cached in redis with single-flight mutex protection and per-viewer like resolution.
  */
 export const getTrendingArticles = async (
 	limit = 10,
+	viewerId?: string,
 ): Promise<TrendingArticle[]> => {
 	const key = getTrendingArticlesKey(limit);
 
@@ -223,6 +325,8 @@ export const getTrendingArticles = async (
 					publishedAt: article.publishedAt,
 					createdAt: article.createdAt,
 					updatedAt: article.updatedAt,
+					tags: tagsSubquerySql,
+					author: authorSubquerySql,
 					likeCount: sql<number>`COUNT(DISTINCT ${articleLike.userId})::int`,
 					commentCount: sql<number>`COUNT(DISTINCT ${comment.id})::int`,
 					engagementScore: sql<number>`(COUNT(DISTINCT ${articleLike.userId}) * 2 + COUNT(DISTINCT ${comment.id}))::int`,
@@ -248,19 +352,40 @@ export const getTrendingArticles = async (
 
 			return rows.map((r) => ({
 				...r,
+				tags: r.tags ?? [],
 				likeCount: Number(r.likeCount || 0),
 				commentCount: Number(r.commentCount || 0),
 				engagementScore: Number(r.engagementScore || 0),
+				isLiked: false,
 			}));
 		},
 		{ ttlSeconds: 300, jitter: true },
 	);
 
-	return cached ?? [];
+	const items = cached ?? [];
+	if (!viewerId || items.length === 0) {
+		return items;
+	}
+
+	const articleIds = items.map((a) => a.id);
+	const userLikes = await db
+		.select({ articleId: articleLike.articleId })
+		.from(articleLike)
+		.where(
+			and(
+				inArray(articleLike.articleId, articleIds),
+				eq(articleLike.userId, viewerId),
+			),
+		);
+	const likedSet = new Set(userLikes.map((l) => l.articleId));
+	return items.map((a) => ({
+		...a,
+		isLiked: likedSet.has(a.id),
+	}));
 };
 
 /**
- * adds a like to a published article for the user.
+ * adds a like to a published article for the user and invalidates cache.
  */
 export const likeArticle = async (articleId: string, userId: string) => {
 	await assertPublished(articleId);
@@ -278,13 +403,17 @@ export const likeArticle = async (articleId: string, userId: string) => {
 		} else {
 			await getArticleLikesCount(articleId);
 		}
+		await Promise.all([
+			cache.del(getArticleCacheKey(articleId)),
+			cache.invalidatePattern("articles:trending:*"),
+		]);
 	}
 
 	return getLikeResult(articleId, userId);
 };
 
 /**
- * removes a like from a published article for the user.
+ * removes a like from a published article for the user and invalidates cache.
  */
 export const unlikeArticle = async (articleId: string, userId: string) => {
 	await assertPublished(articleId);
@@ -303,26 +432,44 @@ export const unlikeArticle = async (articleId: string, userId: string) => {
 		} else {
 			await getArticleLikesCount(articleId);
 		}
+		await Promise.all([
+			cache.del(getArticleCacheKey(articleId)),
+			cache.invalidatePattern("articles:trending:*"),
+		]);
 	}
 
 	return getLikeResult(articleId, userId);
 };
 
 /**
- * lists published articles with optional tag filtering, search, and cursor pagination.
+ * lists published articles with optional tag, author, search, and cursor pagination.
  */
 export const listPublicArticles = async (
 	cursor: string | undefined,
 	limit: number,
 	tagName?: string,
 	searchTerm?: string,
+	authorName?: string,
+	viewerId?: string,
 ) => {
 	const conditions = [eq(article.status, "published")];
 	const normalizedTag = tagName?.trim().toLowerCase();
 	const normalizedSearch = searchTerm?.trim();
+	const normalizedAuthor = authorName?.trim().toLowerCase();
+
 	if (normalizedSearch) {
 		conditions.push(
 			sql`to_tsvector('english', ${article.title} || ' ' || ${article.body}) @@ plainto_tsquery('english', ${normalizedSearch})` as never,
+		);
+	}
+	if (normalizedAuthor) {
+		conditions.push(
+			sql`EXISTS (
+				SELECT 1 FROM ${user} u
+				LEFT JOIN ${profile} p ON p.user_id = u.id
+				WHERE u.id = ${article.authorId}
+				  AND (LOWER(p.username) = ${normalizedAuthor} OR LOWER(u.name) = ${normalizedAuthor})
+			)` as never,
 		);
 	}
 	if (cursor) {
@@ -339,21 +486,19 @@ export const listPublicArticles = async (
 	}
 
 	const records = normalizedTag
-		? (
-				await db
-					.select({ article })
-					.from(article)
-					.innerJoin(articleTag, eq(articleTag.articleId, article.id))
-					.innerJoin(
-						tag,
-						and(eq(tag.id, articleTag.tagId), eq(tag.name, normalizedTag)),
-					)
-					.where(and(...conditions))
-					.orderBy(desc(article.publishedAt), desc(article.id))
-					.limit(limit + 1)
-			).map((record) => record.article)
+		? await db
+				.select(buildArticleSelect(viewerId))
+				.from(article)
+				.innerJoin(articleTag, eq(articleTag.articleId, article.id))
+				.innerJoin(
+					tag,
+					and(eq(tag.id, articleTag.tagId), eq(tag.name, normalizedTag)),
+				)
+				.where(and(...conditions))
+				.orderBy(desc(article.publishedAt), desc(article.id))
+				.limit(limit + 1)
 		: await db
-				.select()
+				.select(buildArticleSelect(viewerId))
 				.from(article)
 				.where(and(...conditions))
 				.orderBy(desc(article.publishedAt), desc(article.id))
@@ -411,21 +556,19 @@ export const listOwnedArticles = async (
 	}
 
 	const records = normalizedTag
-		? (
-				await db
-					.select({ article })
-					.from(article)
-					.innerJoin(articleTag, eq(articleTag.articleId, article.id))
-					.innerJoin(
-						tag,
-						and(eq(tag.id, articleTag.tagId), eq(tag.name, normalizedTag)),
-					)
-					.where(and(...conditions))
-					.orderBy(desc(article.createdAt), desc(article.id))
-					.limit(limit + 1)
-			).map((record) => record.article)
+		? await db
+				.select(buildArticleSelect(userId))
+				.from(article)
+				.innerJoin(articleTag, eq(articleTag.articleId, article.id))
+				.innerJoin(
+					tag,
+					and(eq(tag.id, articleTag.tagId), eq(tag.name, normalizedTag)),
+				)
+				.where(and(...conditions))
+				.orderBy(desc(article.createdAt), desc(article.id))
+				.limit(limit + 1)
 		: await db
-				.select()
+				.select(buildArticleSelect(userId))
 				.from(article)
 				.where(and(...conditions))
 				.orderBy(desc(article.createdAt), desc(article.id))
@@ -453,8 +596,14 @@ export const listOwnedArticles = async (
 export const getOwnedArticle = async (
 	id: string,
 	userId: string,
-): Promise<SelectArticle> => {
-	const record = await getArticleOrThrow(id);
+): Promise<ArticleResponse> => {
+	const [record] = await db
+		.select(buildArticleSelect(userId))
+		.from(article)
+		.where(eq(article.id, id));
+	if (!record) {
+		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
+	}
 	assertOwner(record, userId);
 	return record;
 };
@@ -466,7 +615,7 @@ export const updateArticle = async (
 	id: string,
 	userId: string,
 	payload: ArticleUpdatePayload,
-): Promise<SelectArticle> => {
+): Promise<ArticleResponse> => {
 	if (Object.keys(payload).length === 0) {
 		throw new AppError(
 			"No data provided to update",
@@ -483,38 +632,23 @@ export const updateArticle = async (
 		updatedAt: new Date(),
 	};
 
-	const updated =
-		requestedTags !== undefined
-			? await db.transaction(async (transaction) => {
-					const [record] = await transaction
-						.update(article)
-						.set(updateValues)
-						.where(eq(article.id, id))
-						.returning();
-					if (record) {
-						await syncArticleTags(
-							transaction,
-							id,
-							normalizeTags(requestedTags),
-						);
-					}
-					return record;
-				})
-			: hasFieldUpdates
-				? (
-						await db
-							.update(article)
-							.set(updateValues)
-							.where(eq(article.id, id))
-							.returning()
-					)[0]
-				: current;
-
-	if (!updated) {
-		throw new AppError("Article not found", httpStatusCodes.NOT_FOUND);
+	if (requestedTags !== undefined) {
+		await db.transaction(async (transaction) => {
+			await transaction
+				.update(article)
+				.set(updateValues)
+				.where(eq(article.id, id));
+			await syncArticleTags(transaction, id, normalizeTags(requestedTags));
+		});
+	} else if (hasFieldUpdates) {
+		await db.update(article).set(updateValues).where(eq(article.id, id));
 	}
-	await cache.del(getArticleCacheKey(id));
-	return updated;
+
+	await Promise.all([
+		cache.del(getArticleCacheKey(id)),
+		cache.invalidatePattern("articles:trending:*"),
+	]);
+	return getOwnedArticle(id, userId);
 };
 
 type ArticleTransition = "published" | "archived";
@@ -526,7 +660,7 @@ export const transitionArticle = async (
 	id: string,
 	userId: string,
 	transition: ArticleTransition,
-): Promise<SelectArticle> => {
+): Promise<ArticleResponse> => {
 	const current = await getArticleOrThrow(id);
 	assertOwner(current, userId);
 
@@ -562,7 +696,7 @@ export const transitionArticle = async (
 		cache.invalidatePattern("articles:trending:*"),
 		cache.invalidatePattern("tags:popular:*"),
 	]);
-	return updated;
+	return getOwnedArticle(id, userId);
 };
 
 /**

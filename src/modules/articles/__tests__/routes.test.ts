@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth } from "@/core/auth";
-import type { article } from "@/core/db/schema";
 import { createMockSession, createTestApp } from "@/core/test-utils";
 import { articlesRouter } from "../index";
+import type { ArticleResponse } from "../schema";
 import * as articleService from "../service";
 
 describe("Articles Routes Integration Tests", () => {
 	const app = createTestApp("/articles", articlesRouter);
 
-	const mockArticle: typeof article.$inferSelect = {
+	const mockArticle: ArticleResponse = {
 		id: "art_123",
 		authorId: "usr_123",
 		title: "Test Title",
@@ -19,6 +19,16 @@ describe("Articles Routes Integration Tests", () => {
 		publishedAt: new Date(),
 		createdAt: new Date(),
 		updatedAt: new Date(),
+		tags: ["test"],
+		likeCount: 0,
+		commentCount: 0,
+		author: {
+			id: "usr_123",
+			username: "testuser",
+			displayName: "Test User",
+			avatarUrl: null,
+		},
+		isLiked: false,
 	};
 
 	beforeEach(() => {
@@ -172,6 +182,7 @@ describe("Articles Routes Integration Tests", () => {
 	});
 
 	it("should return 200 OK and Cache-Control header on GET /articles/trending", async () => {
+		vi.spyOn(auth.api, "getSession").mockResolvedValue(null);
 		vi.spyOn(articleService, "getTrendingArticles").mockResolvedValue([
 			{
 				...mockArticle,
@@ -185,6 +196,7 @@ describe("Articles Routes Integration Tests", () => {
 
 		expect(res.status).toBe(200);
 		expect(res.headers.get("Cache-Control")).toContain("public");
+		expect(res.headers.get("Vary")).toContain("Authorization");
 		const json = await res.json();
 		expect(json.success).toBe(true);
 		expect(json.data).toHaveLength(1);

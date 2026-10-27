@@ -1,10 +1,12 @@
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import * as httpStatusCodes from "stoker/http-status-codes";
+import { cache } from "@/core/cache";
 import { db } from "@/core/db";
 import { article, comment } from "@/core/db/schema";
 import { AppError } from "@/core/errors";
 import { decodeCursor, encodeCursor } from "@/core/pagination";
 import { generateId } from "@/core/utils";
+import { getArticleCacheKey } from "@/modules/articles/service";
 import type {
 	CommentCreatePayload,
 	CommentItem,
@@ -248,6 +250,10 @@ export const createComment = async (
 		})
 		.returning();
 	if (!created) throw new AppError("Comment could not be created");
+	await Promise.all([
+		cache.del(getArticleCacheKey(articleId)),
+		cache.invalidatePattern("articles:trending:*"),
+	]);
 	return created;
 };
 
@@ -308,5 +314,9 @@ export const deleteComment = async (commentId: string, authorId: string) => {
 		.set({ body: "Comment deleted", deletedAt: new Date() })
 		.where(eq(comment.id, commentId))
 		.returning();
+	await Promise.all([
+		cache.del(getArticleCacheKey(current.articleId)),
+		cache.invalidatePattern("articles:trending:*"),
+	]);
 	return deleted;
 };

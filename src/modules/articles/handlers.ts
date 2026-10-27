@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import * as httpStatusCodes from "stoker/http-status-codes";
 import { AppError } from "@/core/errors";
-import { setPublicCacheHeaders } from "@/core/server";
+import { setCacheHeaders, setPrivateCacheHeaders } from "@/core/server";
 import type { AppBindings, AppRouteHandler } from "@/core/types";
 import type {
 	ArchiveArticleRoute,
@@ -42,6 +42,7 @@ export const create: AppRouteHandler<CreateArticleRoute> = async (c) => {
 		authenticatedUser(c).id,
 		c.req.valid("json"),
 	);
+	setPrivateCacheHeaders(c);
 	return c.json(
 		{ success: true, message: "Article created successfully", data: result },
 		httpStatusCodes.CREATED,
@@ -52,8 +53,9 @@ export const trending: AppRouteHandler<GetTrendingArticlesRoute> = async (
 	c,
 ) => {
 	const { limit } = c.req.valid("query");
-	const result = await getTrendingArticles(limit);
-	setPublicCacheHeaders(c, 60, 300);
+	const user = c.get("user");
+	const result = await getTrendingArticles(limit, user?.id);
+	setCacheHeaders(c, Boolean(user), 60, 300);
 	return c.json(
 		{
 			success: true,
@@ -65,8 +67,9 @@ export const trending: AppRouteHandler<GetTrendingArticlesRoute> = async (
 };
 
 export const getPublic: AppRouteHandler<GetPublicArticleRoute> = async (c) => {
-	const result = await getPublicArticle(c.req.valid("param").id);
-	setPublicCacheHeaders(c, 60, 300);
+	const user = c.get("user");
+	const result = await getPublicArticle(c.req.valid("param").id, user?.id);
+	setCacheHeaders(c, Boolean(user), 60, 300);
 	return c.json(
 		{ success: true, message: "Article retrieved successfully", data: result },
 		httpStatusCodes.OK,
@@ -76,8 +79,17 @@ export const getPublic: AppRouteHandler<GetPublicArticleRoute> = async (c) => {
 export const listPublic: AppRouteHandler<ListPublicArticlesRoute> = async (
 	c,
 ) => {
-	const { cursor, limit, tag, search } = c.req.valid("query");
-	const result = await listPublicArticles(cursor, limit, tag, search);
+	const { cursor, limit, tag, search, author } = c.req.valid("query");
+	const user = c.get("user");
+	const result = await listPublicArticles(
+		cursor,
+		limit,
+		tag,
+		search,
+		author,
+		user?.id,
+	);
+	setCacheHeaders(c, Boolean(user), 60, 300);
 	return c.json(
 		{
 			success: true,
@@ -99,6 +111,7 @@ export const listMine: AppRouteHandler<ListOwnedArticlesRoute> = async (c) => {
 		tag,
 		search,
 	);
+	setPrivateCacheHeaders(c);
 	return c.json(
 		{
 			success: true,
@@ -112,6 +125,7 @@ export const listMine: AppRouteHandler<ListOwnedArticlesRoute> = async (c) => {
 export const getMine: AppRouteHandler<GetOwnedArticleRoute> = async (c) => {
 	const user = authenticatedUser(c);
 	const result = await getOwnedArticle(c.req.valid("param").id, user.id);
+	setPrivateCacheHeaders(c);
 	return c.json(
 		{ success: true, message: "Article retrieved successfully", data: result },
 		httpStatusCodes.OK,
@@ -125,6 +139,7 @@ export const update: AppRouteHandler<UpdateArticleRoute> = async (c) => {
 		user.id,
 		c.req.valid("json"),
 	);
+	setPrivateCacheHeaders(c);
 	return c.json(
 		{ success: true, message: "Article updated successfully", data: result },
 		httpStatusCodes.OK,
@@ -147,6 +162,7 @@ export const publish: AppRouteHandler<PublishArticleRoute> = async (c) => {
 		user.id,
 		"published",
 	);
+	setPrivateCacheHeaders(c);
 	return c.json(
 		{
 			success: true,
@@ -164,6 +180,7 @@ export const archive: AppRouteHandler<ArchiveArticleRoute> = async (c) => {
 		user.id,
 		"archived",
 	);
+	setPrivateCacheHeaders(c);
 	return c.json(
 		{
 			success: true,
