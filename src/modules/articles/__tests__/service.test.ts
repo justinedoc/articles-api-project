@@ -129,12 +129,12 @@ describe("Article Service (PostgreSQL integration)", () => {
 			" backend ",
 			"distributed systems",
 		);
-		expect(filtered.data.map(({ id }) => id)).toEqual([matching.id]);
+		expect(filtered.articles.map(({ id }) => id)).toEqual([matching.id]);
 		expect(filtered.nextCursor).toBeNull();
 		expect(draft.status).toBe("draft");
 
 		const page = await listPublicArticles(undefined, 1, "backend");
-		expect(page.data).toHaveLength(1);
+		expect(page.articles).toHaveLength(1);
 		expect(page.nextCursor).toBeNull();
 	});
 
@@ -269,24 +269,24 @@ describe("Article Service (PostgreSQL integration)", () => {
 
 		// 1. List all owned articles (no status filter)
 		const allOwned = await listOwnedArticles(userId, undefined, 10);
-		expect(allOwned.data.length).toBe(3);
-		expect(allOwned.data.map((a) => a.id).sort()).toEqual(
+		expect(allOwned.articles.length).toBe(3);
+		expect(allOwned.articles.map((a) => a.id).sort()).toEqual(
 			[draft1.id, draft2.id, pub.id].sort(),
 		);
 
 		// 2. Filter by status = "draft"
 		const draftsOnly = await listOwnedArticles(userId, undefined, 10, "draft");
-		expect(draftsOnly.data.length).toBe(2);
-		expect(draftsOnly.data.every((a) => a.status === "draft")).toBe(true);
+		expect(draftsOnly.articles.length).toBe(2);
+		expect(draftsOnly.articles.every((a) => a.status === "draft")).toBe(true);
 
 		// 3. Filter by status = "published"
 		const pubOnly = await listOwnedArticles(userId, undefined, 10, "published");
-		expect(pubOnly.data.length).toBe(1);
-		expect(pubOnly.data[0].id).toBe(pub.id);
+		expect(pubOnly.articles.length).toBe(1);
+		expect(pubOnly.articles[0].id).toBe(pub.id);
 
 		// 4. Cursor pagination on owned articles
 		const page1 = await listOwnedArticles(userId, undefined, 1);
-		expect(page1.data.length).toBe(1);
+		expect(page1.articles.length).toBe(1);
 		expect(page1.nextCursor).toBeDefined();
 
 		const page2 = await listOwnedArticles(
@@ -294,8 +294,8 @@ describe("Article Service (PostgreSQL integration)", () => {
 			page1.nextCursor ?? undefined,
 			1,
 		);
-		expect(page2.data.length).toBe(1);
-		expect(page2.data[0].id).not.toBe(page1.data[0].id);
+		expect(page2.articles.length).toBe(1);
+		expect(page2.articles[0].id).not.toBe(page1.articles[0].id);
 	});
 
 	it("enriches articles with alphabetical tags, metrics, author profile, and viewer like state", async () => {
@@ -349,8 +349,8 @@ describe("Article Service (PostgreSQL integration)", () => {
 			"author_jane",
 			viewer.id,
 		);
-		expect(byAuthor.data.some((a) => a.id === created.id)).toBe(true);
-		const found = byAuthor.data.find((a) => a.id === created.id);
+		expect(byAuthor.articles.some((a) => a.id === created.id)).toBe(true);
+		const found = byAuthor.articles.find((a) => a.id === created.id);
 		expect(found?.isLiked).toBe(true);
 
 		// Filter by non-existent author
@@ -361,6 +361,6 @@ describe("Article Service (PostgreSQL integration)", () => {
 			undefined,
 			"nonexistent_user",
 		);
-		expect(byUnknown.data.length).toBe(0);
+		expect(byUnknown.articles.length).toBe(0);
 	});
 });

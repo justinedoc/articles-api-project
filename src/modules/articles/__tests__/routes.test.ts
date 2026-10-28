@@ -95,7 +95,7 @@ describe("Articles Routes Integration Tests", () => {
 
 		const json = await res.json();
 		expect(json.success).toBe(true);
-		expect(json.data.data).toHaveLength(1);
+		expect(json.data.articles).toHaveLength(1);
 		expect(json.data.nextCursor).toBeNull();
 	});
 
@@ -228,7 +228,7 @@ describe("Articles Routes Integration Tests", () => {
 		expect(res.status).toBe(200);
 		const json = await res.json();
 		expect(json.success).toBe(true);
-		expect(json.data.data).toHaveLength(1);
+		expect(json.data.articles).toHaveLength(1);
 		expect(articleService.listOwnedArticles).toHaveBeenCalledWith(
 			"usr_123",
 			undefined,

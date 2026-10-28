@@ -50,23 +50,23 @@ describe("E2E: Articles Lifecycle & Social Interactions", () => {
 		// 3. Author can list their own articles via /articles/mine
 		const authorMineList = await author.client.get<{
 			data: {
-				data: Array<{ id: string; status: string }>;
+				articles: Array<{ id: string; status: string }>;
 				nextCursor: string | null;
 			};
 		}>("/api/v1/articles/mine");
 		expect(authorMineList.status).toBe(200);
-		expect(authorMineList.data.data.data.some((a) => a.id === articleId)).toBe(
-			true,
-		);
+		expect(
+			authorMineList.data.data.articles.some((a) => a.id === articleId),
+		).toBe(true);
 
 		// 4. Author can filter own articles by status=draft
 		const authorDrafts = await author.client.get<{
-			data: { data: Array<{ id: string; status: string }> };
+			data: { articles: Array<{ id: string; status: string }> };
 		}>("/api/v1/articles/mine?status=draft");
 		expect(authorDrafts.status).toBe(200);
-		expect(authorDrafts.data.data.data.every((a) => a.status === "draft")).toBe(
-			true,
-		);
+		expect(
+			authorDrafts.data.data.articles.every((a) => a.status === "draft"),
+		).toBe(true);
 
 		// 5. Unauthenticated request to /articles/mine is rejected with 401
 		const unauthMine = await apiClient.get("/api/v1/articles/mine");
@@ -202,58 +202,60 @@ describe("E2E: Articles Lifecycle & Social Interactions", () => {
 		// Tag filtering
 		const tagRes = await apiClient.get<{
 			data: {
-				data: Array<{ id: string; title: string }>;
+				articles: Array<{ id: string; title: string }>;
 				nextCursor: string | null;
 			};
 		}>(`/api/v1/articles?tag=${uniqueTopic}`);
 		expect(tagRes.status).toBe(200);
-		expect(tagRes.data.data.data.length).toBe(2);
+		expect(tagRes.data.data.articles.length).toBe(2);
 
 		// Specific tag filter
 		const physicsRes = await apiClient.get<{
 			data: {
-				data: Array<{ id: string }>;
+				articles: Array<{ id: string }>;
 			};
 		}>(`/api/v1/articles?tag=physics`);
 		expect(physicsRes.status).toBe(200);
 		expect(
-			physicsRes.data.data.data.some((a) => a.id === article1.data.data.id),
+			physicsRes.data.data.articles.some((a) => a.id === article1.data.data.id),
 		).toBe(true);
 
 		// Full-text search
 		const searchRes = await apiClient.get<{
 			data: {
-				data: Array<{ id: string }>;
+				articles: Array<{ id: string }>;
 			};
 		}>(`/api/v1/articles?search=quantum`);
 		expect(searchRes.status).toBe(200);
 		expect(
-			searchRes.data.data.data.some((a) => a.id === article1.data.data.id),
+			searchRes.data.data.articles.some((a) => a.id === article1.data.data.id),
 		).toBe(true);
 
 		// Cursor pagination: page size 1
 		const page1 = await apiClient.get<{
 			data: {
-				data: Array<{ id: string }>;
+				articles: Array<{ id: string }>;
 				nextCursor: string | null;
 			};
 		}>(`/api/v1/articles?tag=${uniqueTopic}&limit=1`);
 		expect(page1.status).toBe(200);
-		expect(page1.data.data.data.length).toBe(1);
+		expect(page1.data.data.articles.length).toBe(1);
 		expect(page1.data.data.nextCursor).toBeDefined();
 
 		// Page 2 using nextCursor
 		const page2 = await apiClient.get<{
 			data: {
-				data: Array<{ id: string }>;
+				articles: Array<{ id: string }>;
 				nextCursor: string | null;
 			};
 		}>(
 			`/api/v1/articles?tag=${uniqueTopic}&limit=1&cursor=${page1.data.data.nextCursor}`,
 		);
 		expect(page2.status).toBe(200);
-		expect(page2.data.data.data.length).toBe(1);
-		expect(page2.data.data.data[0].id).not.toBe(page1.data.data.data[0].id);
+		expect(page2.data.data.articles.length).toBe(1);
+		expect(page2.data.data.articles[0].id).not.toBe(
+			page1.data.data.articles[0].id,
+		);
 	});
 
 	it("should allow authenticated users to like and unlike published articles", async () => {

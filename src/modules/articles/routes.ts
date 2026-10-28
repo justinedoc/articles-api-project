@@ -59,7 +59,7 @@ export const listPublicArticlesRoute = createRoute({
 	responses: {
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Articles retrieved successfully", true).extend({
-				data: cursorPaginationResultSchema(articleResponseSchema),
+				data: cursorPaginationResultSchema(articleResponseSchema, "articles"),
 			}),
 			"Articles retrieved successfully",
 		),
@@ -100,7 +100,7 @@ export const listOwnedArticlesRoute = createRoute({
 		[httpStatusCodes.OK]: jsonContent(
 			createMessageSchema("Owned articles retrieved successfully", true).extend(
 				{
-					data: cursorPaginationResultSchema(articleResponseSchema),
+					data: cursorPaginationResultSchema(articleResponseSchema, "articles"),
 				},
 			),
 			"Owned articles retrieved successfully",
