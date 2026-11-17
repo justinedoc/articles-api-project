@@ -24,7 +24,7 @@ export function configureOpenAPI(router: AppOpenAPI, version: string) {
 		openapi: "3.2.1",
 		info: {
 			version: packageJSON.version,
-			title: `Article Project API ${version.toUpperCase()}`,
+			title: `Justin's Article Project API ${version.toUpperCase()}`,
 		},
 		servers: [
 			{
