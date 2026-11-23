@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { apiClient } from "./helpers/client";
 
 describe("E2E: System, Docs & Middleware", () => {
-	it("should serve OpenAPI 3.2.1 documentation spec at /api/v1/doc", async () => {
+	it("should serve OpenAPI 3.2.0 documentation spec at /api/v1/doc", async () => {
 		const res = await apiClient.get<Record<string, unknown>>("/api/v1/doc");
 		expect(res.status).toBe(200);
 
@@ -13,7 +13,7 @@ describe("E2E: System, Docs & Middleware", () => {
 			components?: { securitySchemes?: Record<string, unknown> };
 		};
 
-		expect(spec.openapi).toBe("3.2.1");
+		expect(spec.openapi).toBe("3.2.0");
 		expect(spec.info.title).toContain("Project API");
 		expect(spec.components?.securitySchemes?.BearerAuth).toBeDefined();
 		expect(spec.paths["/system/health"]).toBeDefined();

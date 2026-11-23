@@ -20,8 +20,8 @@ export function configureOpenAPI(router: AppOpenAPI, version: string) {
 
 	const basePath = `/api/${version}`;
 
-	router.doc("/doc", {
-		openapi: "3.2.1",
+	router.doc31("/doc", {
+		openapi: "3.2.0",
 		info: {
 			version: packageJSON.version,
 			title: `Justin's Article Project API ${version.toUpperCase()}`,

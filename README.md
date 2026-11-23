@@ -15,7 +15,7 @@ Built with [Hono](https://hono.dev/), [Better Auth](https://www.better-auth.com/
 - Threaded article comments with nested replies and soft deletion
 - PostgreSQL persistence with Drizzle schema and migrations
 - Redis-backed rate limiting and health monitoring
-- OpenAPI 3.2.1 specification and interactive Scalar documentation
+- OpenAPI 3.2.0 specification and interactive Scalar documentation
 - Cache headers (`Cache-Control`, `ETag`, conditional `304 Not Modified`)
 - Unit, service, route integration, and end-to-end test suites
 
